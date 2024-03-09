@@ -12,6 +12,7 @@ export type WsInputMessage =
 export type WsOutputMessage =
   | {
       type: "CHAT_STARTED";
+      name: string;
       id: string;
     }
   | {

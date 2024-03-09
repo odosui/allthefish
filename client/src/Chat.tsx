@@ -9,27 +9,23 @@ type Message = {
   content: string;
 };
 
-const Chat: React.FC = () => {
+const Chat: React.FC<{
+  id: string;
+  name: string;
+}> = ({ id, name }) => {
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [waitingTillReplyFinish, setWaitingTillReplyFinish] =
     useState<boolean>(false);
-  const [chatId, setChatId] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
 
-  const { postMessage, lastMessage, readyState, startChat } = useWs();
+  const { postMessage, lastMessage, readyState } = useWs();
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
-  const chatTitle = "Claude Opus";
-
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!chatId) {
-      return;
-    }
 
     setWaitingTillReplyFinish(true);
     setMessages((prev) => [
@@ -39,39 +35,38 @@ const Chat: React.FC = () => {
         content: message,
       },
     ]);
-    postMessage(message, chatId);
+    postMessage(message, id);
     setMessage("");
     taRef.current?.focus();
   };
 
-  const handleStartChat = () => {
-    // startChat("claude-opus");
-    startChat("default");
-  };
-
-  const handleWsMessage = useCallback((msg: WsOutputMessage) => {
-    if (msg.type === "CHAT_STARTED") {
-      setChatId(msg.id);
-    } else if (msg.type === "CHAT_PARTIAL_REPLY") {
-      setMessages((prev) => {
-        const lastMsg = prev[prev.length - 1];
-        if (lastMsg?.from === "assistant") {
-          return [
-            ...prev.slice(0, prev.length - 1),
-            { from: "assistant", content: lastMsg.content + msg.content },
-          ];
-        } else {
-          return [...prev, { from: "assistant", content: msg.content }];
-        }
-      });
-    } else if (msg.type === "CHAT_REPLY_FINISH") {
-      setWaitingTillReplyFinish(false);
-    } else if (msg.type === "CHAT_ERROR") {
-      setChatError(msg.error);
-    } else {
-      console.log(msg);
-    }
-  }, []);
+  const handleWsMessage = useCallback(
+    (msg: WsOutputMessage) => {
+      if (msg.type === "CHAT_PARTIAL_REPLY") {
+        if (msg.chatId !== id) return;
+        setMessages((prev) => {
+          const lastMsg = prev[prev.length - 1];
+          if (lastMsg?.from === "assistant") {
+            return [
+              ...prev.slice(0, prev.length - 1),
+              { from: "assistant", content: lastMsg.content + msg.content },
+            ];
+          } else {
+            return [...prev, { from: "assistant", content: msg.content }];
+          }
+        });
+      } else if (msg.type === "CHAT_REPLY_FINISH") {
+        if (msg.chatId !== id) return;
+        setWaitingTillReplyFinish(false);
+      } else if (msg.type === "CHAT_ERROR") {
+        if (msg.chatId !== id) return;
+        setChatError(msg.error);
+      } else {
+        // don't care
+      }
+    },
+    [id]
+  );
 
   useEffect(() => {
     async function loadProfiles() {
@@ -96,7 +91,7 @@ const Chat: React.FC = () => {
 
   return (
     <div className="chat">
-      <div className="chat-title">{chatTitle}</div>
+      <div className="chat-title">{name}</div>
 
       <div className="messages" ref={messagesRef}>
         {messages.map((m, i) => (
@@ -113,34 +108,30 @@ const Chat: React.FC = () => {
         {chatError && <div className="message error">{chatError}</div>}
       </div>
 
-      {chatId === null ? (
-        <button onClick={handleStartChat}>Start chat</button>
-      ) : (
-        <div className="message-form">
-          <form>
-            <textarea
-              onKeyDown={(e) => {
-                // submit on CMD+Enter
-                if (e.key === "Enter" && e.metaKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              ref={taRef}
-              autoFocus
-            ></textarea>
-            <button
-              type="submit"
-              onClick={handleSendMessage}
-              disabled={!readyState || waitingTillReplyFinish || !!chatError}
-            >
-              ⌘↩
-            </button>
-          </form>
-        </div>
-      )}
+      <div className="message-form">
+        <form>
+          <textarea
+            onKeyDown={(e) => {
+              // submit on CMD+Enter
+              if (e.key === "Enter" && e.metaKey) {
+                e.preventDefault();
+                handleSendMessage(e);
+              }
+            }}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            ref={taRef}
+            autoFocus
+          ></textarea>
+          <button
+            type="submit"
+            onClick={handleSendMessage}
+            disabled={!readyState || waitingTillReplyFinish || !!chatError}
+          >
+            ⌘↩
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

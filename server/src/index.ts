@@ -27,8 +27,12 @@ async function main() {
 
   app.get("/api/profiles", async (_req, res) => {
     try {
-      const profiles = await ConfigFile.readProfiles();
-      res.json({ profiles });
+      const profiles = Object.keys(config?.profiles || {}).map((name) => ({
+        name,
+        vendor: config?.profiles[name].vendor,
+        model: config?.profiles[name].model,
+      }));
+      res.json(profiles);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
@@ -126,6 +130,7 @@ async function main() {
 
         const msg: WsOutputMessage = {
           type: "CHAT_STARTED",
+          name: data.profile,
           id,
         };
 

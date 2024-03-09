@@ -32,7 +32,7 @@
   --color-bg: #f1f1f1;
   --color-bg-alt: #e0e0e0;
   --color-border: #e0e0e0;
-  --color-main: #646cff
+  --color-main: #646cff;
   --color-text: #333;
 }
 
@@ -69,21 +69,32 @@ button {
   transition: background-color 0.25s;
 }
 
-.app {
+main.app {
   display: flex;
-  justify-content: space-between;
-  height: 100vh;
+  gap: var(--u3);
+  /* height: 100vh; */
   padding: 0 var(--u3);
+  overflow-x: auto;
+  /* width: 100%; */
+
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
 }
 
-.app main {
-  flex: 1;
+.app.no-chats {
+  justify-content: center;
+  align-items: center;
 }
 
 .app .chat {
   width: var(--u13);
+  min-width: var(--u13);
+  flex-basis: var(--u13);
+  flex: 0 0 auto;
   background-color: #fff;
-  padding: var(--u3);
   border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
@@ -93,6 +104,7 @@ button {
 .app .chat .messages {
   flex: 1;
   overflow-y: auto;
+  padding: var(--u3);
 }
 
 .message-form {
@@ -101,6 +113,7 @@ button {
   padding: var(--u2);
   border: 1px solid var(--color-border);
   border-radius: var(--u1);
+  margin: 0 var(--u3) var(--u3) var(--u3);
 }
 
 .message-form form {
@@ -215,8 +228,9 @@ li p {
 .chat-title {
   position: absolute;
   top: var(--u3);
-  background-color: var(--color-bg);
-  padding: var(--u1) var(--u2);
+  background-color: var(--color-main);
+  color: white;
+  padding: var(--u0) var(--u1);
   display: inline-block;
   right: 0;
   border-top-left-radius: var(--u1);
@@ -224,4 +238,45 @@ li p {
   border-bottom: 1px solid var(--color-border);
   border-top: 1px solid var(--color-border);
   border-left: 1px solid var(--color-border);
+  font-size: 0.8em;
+}
+
+.chat-starter {
+  background: white;
+  padding: var(--u3);
+  margin: var(--u4);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: auto;
+  margin-bottom: auto;
+  flex: 0 0 auto;
+}
+
+.chat-starter ul {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.chat-starter ul li {
+  margin-bottom: var(--u2);
+  width: 100%;
+}
+
+.chat-starter ul li button {
+  width: 100%;
+  padding: var(--u2);
+  border-radius: 8px;
+  background-color: var(--color-bg);
+  font-weight: 500;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-starter ul li button:hover {
+  background-color: var(--color-bg-alt);
 }

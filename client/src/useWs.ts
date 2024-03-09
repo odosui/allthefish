@@ -4,7 +4,9 @@ import { WsInputMessage } from "../../shared/types";
 const WS_URL = "ws://localhost:3000";
 
 export function useWs() {
-  const { sendJsonMessage, lastMessage, readyState } = useWebSocket(WS_URL);
+  const { sendJsonMessage, lastMessage, readyState } = useWebSocket(WS_URL, {
+    share: true,
+  });
 
   const startChat = (profile: string) => {
     const e: WsInputMessage = {

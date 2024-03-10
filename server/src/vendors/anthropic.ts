@@ -3,10 +3,36 @@ import { MessageParam } from "@anthropic-ai/sdk/resources";
 
 const MAX_TOKENS = 1024;
 
-function user(content: string): MessageParam {
+function user(
+  content: string,
+  file?: {
+    data: string;
+    type: string;
+  }
+): MessageParam {
+  if (!file) {
+    return {
+      role: "user",
+      content,
+    };
+  }
+
   return {
     role: "user",
-    content,
+    content: [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: file.type as "image/png" | "image/jpeg",
+          data: file.data,
+        },
+      },
+      {
+        type: "text",
+        text: content,
+      },
+    ],
   };
 }
 
@@ -36,8 +62,8 @@ export class AnthropicChat {
     });
   }
 
-  async postMessage(input: string) {
-    this.messages.push(user(input));
+  async postMessage(input: string, file?: { data: string; type: string }) {
+    this.messages.push(user(input, file));
     let msg = "";
 
     this.client.messages

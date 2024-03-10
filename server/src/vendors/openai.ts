@@ -15,7 +15,7 @@ export class OpenAiChat {
     this.client = new OpenAI({ apiKey });
   }
 
-  async postMessage(input: string) {
+  async postMessage(input: string, _file?: { data: string; type: string }) {
     this.messages.push(user(input));
 
     const stream = await this.client.chat.completions.create({

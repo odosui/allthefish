@@ -18,10 +18,18 @@ export function useWs() {
     sendJsonMessage(e);
   };
 
-  const postMessage = (message: string, chatId: string) => {
+  const postMessage = (
+    message: string,
+    chatId: string,
+    file?: {
+      data: string;
+      type: string;
+    }
+  ) => {
     const e: WsInputMessage = {
       type: "POST_MESSAGE",
       content: message,
+      image: file,
       chatId,
     };
 

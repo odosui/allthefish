@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import api from "./api";
-import { useWs } from "./useWs";
-import { WsOutputMessage } from "../../shared/types";
 import Markdown from "react-markdown";
+import { WsOutputMessage } from "../../shared/types";
+import { useWs } from "./useWs";
 
 type Message = {
   from: "user" | "assistant";
   content: string;
+  image?: {
+    data: string;
+    type: string;
+  };
 };
 
 const Chat: React.FC<{
@@ -21,6 +24,11 @@ const Chat: React.FC<{
 
   const { postMessage, lastMessage, readyState } = useWs();
 
+  const [file, setFile] = useState<{
+    data: string;
+    type: string;
+  } | null>(null);
+
   const taRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -28,15 +36,21 @@ const Chat: React.FC<{
     e.preventDefault();
 
     setWaitingTillReplyFinish(true);
-    setMessages((prev) => [
-      ...prev,
-      {
+    setMessages((prev) => {
+      const newMessage: Message = {
         from: "user",
         content: message,
-      },
-    ]);
-    postMessage(message, id);
+      };
+
+      if (file) {
+        newMessage.image = file;
+      }
+
+      return [...prev, newMessage];
+    });
+    postMessage(message, id, file ?? undefined);
     setMessage("");
+    setFile(null);
     taRef.current?.focus();
   };
 
@@ -68,14 +82,22 @@ const Chat: React.FC<{
     [id]
   );
 
-  useEffect(() => {
-    async function loadProfiles() {
-      const profiles = await api.get<string[]>("/profiles");
-      console.log(profiles);
-    }
+  const handleAttachImage = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
 
-    loadProfiles();
-  }, []);
+      const mediaType = file.type;
+      const base64 = await fileToBase64(file);
+
+      setFile({ data: base64, type: mediaType });
+    };
+    input.click();
+  };
 
   useEffect(() => {
     // scroll to bottom
@@ -102,6 +124,14 @@ const Chat: React.FC<{
             <div className="content">
               <Markdown>{m.content}</Markdown>
             </div>
+            {m.image && (
+              <div className="message-image">
+                <img
+                  src={`data:${m.image.type};base64,${m.image.data}`}
+                  alt="Attached"
+                />
+              </div>
+            )}
           </div>
         ))}
 
@@ -109,7 +139,17 @@ const Chat: React.FC<{
       </div>
 
       <div className="message-form">
-        <form>
+        <div className="message-form-main">
+          <div className="attach-wrapper">
+            <a
+              href="#"
+              onClick={handleAttachImage}
+              role="button"
+              title="Attach an image"
+            >
+              @
+            </a>
+          </div>
           <textarea
             onKeyDown={(e) => {
               // submit on CMD+Enter
@@ -130,10 +170,39 @@ const Chat: React.FC<{
           >
             ⌘↩
           </button>
-        </form>
+        </div>
+        <div className="message-form-footer">
+          {file && (
+            <div className="attached">
+              <img
+                src={`data:${file.type};base64,${file.data}`}
+                alt="Attached"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        const [, base64] = result.split(",");
+        resolve(base64);
+      } else {
+        reject(new Error("FileReader result is not a string"));
+      }
+    };
+    reader.onerror = () => {
+      reject(reader.error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export default Chat;

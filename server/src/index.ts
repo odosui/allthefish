@@ -6,6 +6,16 @@ import { v4 } from "uuid";
 import { OpenAiChat } from "./vendors/openai";
 import { AnthropicChat } from "./vendors/anthropic";
 
+const SYSTEM = [
+  "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
+  "At any time you can ask to update a specific file. Write UPDATE_FILE: <path_of_the_file_to_update>, followed by code.",
+  "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name>.",
+  "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
+  "Please be consise, and don't explain anything until asked by a user.",
+  "Consider the following good practices: files should be small, components should be reusable, the code should be clean and easy to understand. In CSS, use CSS variables. Use css variables (--u1, --u2, and so on) for length units.",
+  "You start at `src/App.tsx`.",
+].join("\n");
+
 const PORT = process.env.PORT || 3000;
 
 async function main() {
@@ -145,7 +155,7 @@ async function main() {
           return;
         }
 
-        c.chat.postMessage(data.content);
+        c.chat.postMessage(data.content, data.image);
         return;
       } else {
         log("Error: Received message is not a valid type", { data });

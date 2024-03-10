@@ -2,6 +2,10 @@ export type WsInputMessage =
   | {
       type: "POST_MESSAGE";
       content: string;
+      image?: {
+        data: string;
+        type: string;
+      };
       chatId: string;
     }
   | {

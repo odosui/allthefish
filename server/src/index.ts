@@ -165,7 +165,7 @@ async function main() {
         }
 
         const id = v4();
-        const worker = new ProjectWorker(config.projects_dir, "testproj", 3001);
+        const worker = new ProjectWorker(config.projects_dir, data.dir, 3001);
 
         const createRes = await worker.createProject();
 
@@ -207,7 +207,7 @@ async function main() {
         const msg: WsOutputMessage = {
           type: "CHAT_STARTED",
           name: data.profile,
-          serverUrl: "http://localhost:5174/",
+          serverUrl: worker.serverUrl(),
           id,
         };
 

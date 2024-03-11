@@ -8,10 +8,11 @@ export function useWs() {
     share: true,
   });
 
-  const startChat = (profile: string) => {
+  const startChat = (name: string, profile: string) => {
     const e: WsInputMessage = {
       type: "START_CHAT",
       profile,
+      dir: name,
     };
 
     console.log("Starting chat", e);

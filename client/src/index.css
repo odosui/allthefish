@@ -334,6 +334,15 @@ li p {
   background-color: var(--color-bg-alt);
 }
 
+.chat-starter input {
+  width: 100%;
+  padding: var(--u2);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--u2);
+  box-sizing: border-box;
+}
+
 .preview {
   flex: 1;
   margin: var(--u3);

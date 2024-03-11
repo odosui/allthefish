@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { log, runBackground, runCmd } from "./helpers";
 import { ChildProcess } from "child_process";
+import { scaffold as scaffoldViteReactTs } from "./templates/vite_react_ts";
 
 const ACTOR = "projworker";
 
@@ -16,6 +17,10 @@ export type WorkerTask =
       name: string;
     };
 
+const SCAFFOLDS = {
+  "vite:react-ts": scaffoldViteReactTs,
+};
+
 export class ProjectWorker {
   private rootPath = "";
   private dirName = "";
@@ -26,6 +31,21 @@ export class ProjectWorker {
     this.rootPath = rootPath;
     this.dirName = dirName;
     this.port = port;
+  }
+
+  async checkTypes() {
+    const dir = path.join(this.rootPath, this.dirName);
+    log(ACTOR, "Checking types for project", { dir });
+    const { code, stdout, stderr } = await runCmd(
+      dir,
+      "./node_modules/.bin/tsc",
+      ["--noEmit"]
+    );
+
+    console.log(
+      "Result of type check",
+      JSON.stringify({ code, stdout, stderr })
+    );
   }
 
   async runTask(task: WorkerTask) {
@@ -44,7 +64,13 @@ export class ProjectWorker {
   startServer() {
     const dir = path.join(this.rootPath, this.dirName);
     log(ACTOR, "Starting project worker");
-    this.serverProcess = runBackground(dir, "npm", ["run", "dev"]);
+    this.serverProcess = runBackground(dir, "npm", [
+      "run",
+      "dev",
+      "--",
+      "--port",
+      this.port.toString(),
+    ]);
   }
 
   async createProject(
@@ -53,56 +79,30 @@ export class ProjectWorker {
     const rootPath = this.rootPath;
     const dirName = this.dirName;
     const dir = path.join(rootPath, dirName);
+
     log(ACTOR, "Creating project new project at", { dir });
 
-    const isExists = await fs
-      .access(dir)
-      .then(() => true)
-      .catch(() => false);
+    const isExists = await isDirExists(dir);
 
     if (isExists) {
       log(ACTOR, "Error: Project already exists", { dir });
       return "EXISTS";
     }
 
-    if (template === "vite:react-ts") {
-      log(ACTOR, "Creating project using template", { template });
-      await runCmd(rootPath, "npm", [
-        "create",
-        "vite@latest",
-        dirName,
-        "--",
-        "--template",
-        "react-ts",
-      ]);
-
-      const indexCss = `${dir}/src/index.css`;
-
-      // don't like the default styles
-      await fs.writeFile(indexCss, "");
-    } else {
+    const scaffold = SCAFFOLDS[template];
+    if (!scaffold) {
       log(ACTOR, "Error: Unknown template", { template });
       return "UNKNOWN_TEMPLATE";
     }
-
-    await runCmd(dir, "git", [
-      "config",
-      "--global",
-      "init.defaultBranch",
-      "main",
-    ]);
-    await runCmd(dir, "git", ["init", dir]);
-    await runCmd(dir, "git", ["add", "."]);
-    await runCmd(dir, "git", ["commit", "-m", "Initial commit"]);
-    await runCmd(dir, "npm", ["install"]);
-
+    log(ACTOR, "Creating project using template", { template });
+    await scaffold(rootPath, dirName);
+    await initGit(dir);
+    await this.checkTypes();
     return "OK";
+  }
 
-    // try {
-    //   await fs.mkdir(dir);
-    // } catch (error) {
-    //   log("[ERROR] Failed to create directory", { dir, error });
-    // }
+  serverUrl() {
+    return `http://localhost:${this.port}`;
   }
 }
 
@@ -167,4 +167,23 @@ export function taskTitle(task: WorkerTask): string {
   } else {
     return "Unknown task";
   }
+}
+
+async function initGit(dir: string) {
+  await runCmd(dir, "git", [
+    "config",
+    "--global",
+    "init.defaultBranch",
+    "main",
+  ]);
+  await runCmd(dir, "git", ["init", dir]);
+  await runCmd(dir, "git", ["add", "."]);
+  await runCmd(dir, "git", ["commit", "-m", "Initial commit"]);
+}
+
+async function isDirExists(dir: string) {
+  return await fs
+    .access(dir)
+    .then(() => true)
+    .catch(() => false);
 }

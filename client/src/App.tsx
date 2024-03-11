@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { WsOutputMessage } from "../../shared/types";
 import Chat from "./Chat";
 import api from "./api";
 import { useWs } from "./useWs";
-import { WsOutputMessage } from "../../shared/types";
-import { TaskInProgress } from "./TaskInProgress";
+import ChatStarter from "./ChatStarter";
 
-type Profile = {
+export type Profile = {
   name: string;
   vendor: string;
   model: string;
@@ -99,34 +99,6 @@ const Preview: React.FC<{ serverUrl: string }> = ({ serverUrl }) => {
   return (
     <div className="preview">
       <iframe src={`${serverUrl}`} title="project" />
-    </div>
-  );
-};
-
-const ChatStarter = ({ profiles }: { profiles: Profile[] }) => {
-  const { startChat } = useWs();
-  const [waiting, setWaiting] = useState(false);
-
-  const handleStartChat = (profile: string) => {
-    startChat(profile);
-    setWaiting(true);
-  };
-
-  return (
-    <div className="chat-starter">
-      {!waiting && (
-        <ul>
-          {profiles.map((profile) => (
-            <li key={profile.name}>
-              <button onClick={() => handleStartChat(profile.name)}>
-                {profile.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {waiting && <TaskInProgress title="Preparing a new app..." />}
     </div>
   );
 };

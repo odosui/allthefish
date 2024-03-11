@@ -35,22 +35,26 @@ export async function runCmd(
   atPath: string,
   cmd: string,
   args: string[]
-): Promise<void> {
-  return new Promise((resolve, reject) => {
+): Promise<{
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolve) => {
     log(ACTOR, `Running command: ${cmd} ${args.join(" ")}`);
     const childProcess = spawn(cmd, args, { cwd: atPath });
+
+    let stdout = "";
+    let stderr = "";
+
     childProcess.stdout.on("data", (data) => {
-      console.log(`stdout: ${data}`);
+      stdout += data;
     });
     childProcess.stderr.on("data", (data) => {
-      console.error(`stderr: ${data}`);
+      stderr += data;
     });
     childProcess.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Command failed with code ${code}`));
-      }
+      resolve({ code, stdout, stderr });
     });
   });
 }

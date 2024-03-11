@@ -5,11 +5,13 @@ import { WsInputMessage, WsOutputMessage } from "../../shared/types";
 import { v4 } from "uuid";
 import { OpenAiChat } from "./vendors/openai";
 import { AnthropicChat } from "./vendors/anthropic";
+import { asString, log } from "./helpers";
+import { ProjectWorker, parseTasks, taskTitle } from "./project_worker";
 
 const SYSTEM = [
   "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
-  "At any time you can ask to update a specific file. Write UPDATE_FILE: <path_of_the_file_to_update>, followed by code.",
-  "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name>.",
+  "At any time you can ask to update a specific file. Write UPDATE_FILE: <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
+  "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name>. Make sure you start with a new line.",
   "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
   "Please be consise, and don't explain anything until asked by a user.",
   "Consider the following good practices: files should be small, components should be reusable, the code should be clean and easy to understand. In CSS, use CSS variables. Use css variables (--u1, --u2, and so on) for length units.",
@@ -54,14 +56,18 @@ async function main() {
 
   const chats: Record<
     string,
-    { profile: string; messages: []; chat: OpenAiChat | AnthropicChat }
+    {
+      profile: string;
+      chat: OpenAiChat | AnthropicChat;
+      worker: ProjectWorker;
+    }
   > = {};
 
   // Set up WebSocket server
   const wsServer = new ws.Server({ server });
 
   wsServer.on("connection", (ws) => {
-    log("New connection");
+    log("root", "New connection");
 
     const handlePartialReply = (msg: string, id: string) => {
       const msgObj: WsOutputMessage = {
@@ -70,14 +76,6 @@ async function main() {
         type: "CHAT_PARTIAL_REPLY",
       };
       ws.send(JSON.stringify(msgObj));
-    };
-
-    const handleReplyFinish = (id: string) => {
-      const msg: WsOutputMessage = {
-        chatId: id,
-        type: "CHAT_REPLY_FINISH",
-      };
-      ws.send(JSON.stringify(msg));
     };
 
     const handleChatError = (id: string, error: string) => {
@@ -89,7 +87,7 @@ async function main() {
       ws.send(JSON.stringify(msg));
     };
 
-    ws.on("message", (message) => {
+    ws.on("message", async (message) => {
       const messageStr = asString(message);
 
       if (messageStr === null) {
@@ -98,67 +96,137 @@ async function main() {
 
       const data = JSON.parse(messageStr) as WsInputMessage;
 
+      const handleReplyFinish = async (cid: string, content: string) => {
+        const msg: WsOutputMessage = {
+          chatId: cid,
+          type: "CHAT_REPLY_FINISH",
+        };
+        ws.send(JSON.stringify(msg));
+
+        // let's update files
+        const c = chats[cid];
+        if (!c) {
+          log("root", "Error: Chat not found", { chatId: cid });
+          return;
+        }
+
+        const tasks = parseTasks(content);
+
+        const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
+
+        for await (const task of installTasks) {
+          const taskId = v4();
+          const msg: WsOutputMessage = {
+            chatId: cid,
+            type: "WORKER_TASK_STARTED",
+            title: taskTitle(task),
+            id: taskId,
+          };
+          ws.send(JSON.stringify(msg));
+
+          await c.worker.runTask(task);
+
+          const msg2: WsOutputMessage = {
+            chatId: cid,
+            type: "WORKER_TASK_FINISHED",
+            id: taskId,
+          };
+          ws.send(JSON.stringify(msg2));
+        }
+
+        const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
+        for await (const task of otherTasks) {
+          const taskId = v4();
+          const msg: WsOutputMessage = {
+            chatId: cid,
+            type: "WORKER_TASK_STARTED",
+            title: taskTitle(task),
+            id: taskId,
+          };
+          ws.send(JSON.stringify(msg));
+
+          await c.worker.runTask(task);
+
+          const msg2: WsOutputMessage = {
+            chatId: cid,
+            type: "WORKER_TASK_FINISHED",
+            id: taskId,
+          };
+          ws.send(JSON.stringify(msg2));
+        }
+      };
+
       if (data.type === "START_CHAT") {
         const p = config?.profiles[data.profile];
 
         if (!p) {
-          log("Error: Profile not found", { profile: data.profile });
+          log("root", "Error: Profile not found", { profile: data.profile });
           return;
         }
 
         const id = v4();
+        const worker = new ProjectWorker(config.projects_dir, "testproj", 3001);
+
+        const createRes = await worker.createProject();
+
+        if (createRes === "EXISTS") {
+          log("root", "Error: Project already exists", {
+            dir: config.projects_dir,
+          });
+          return;
+        }
+
+        worker.startServer();
 
         if (p.vendor === "openai") {
-          const chat = new OpenAiChat(config.openai_key, p.model, p.system);
+          const chat = new OpenAiChat(config.openai_key, p.model, SYSTEM);
           chats[id] = {
             profile: data.profile,
-            messages: [],
             chat,
+            worker,
           };
 
           chat.onPartialReply((m) => handlePartialReply(m, id));
-          chat.onReplyFinish(() => handleReplyFinish(id));
+          chat.onReplyFinish((msg) => handleReplyFinish(id, msg));
         } else if (p.vendor === "anthropic") {
-          const chat = new AnthropicChat(
-            config.anthropic_key,
-            p.model,
-            p.system
-          );
+          const chat = new AnthropicChat(config.anthropic_key, p.model, SYSTEM);
           chats[id] = {
             profile: data.profile,
-            messages: [],
             chat,
+            worker,
           };
 
           chat.onPartialReply((m) => handlePartialReply(m, id));
-          chat.onReplyFinish(() => handleReplyFinish(id));
+          chat.onReplyFinish((msg) => handleReplyFinish(id, msg));
           chat.onError((err) => handleChatError(id, err));
         } else {
-          log("Error: Vendor not supported", { vendor: p.vendor });
+          log("root", "Error: Vendor not supported", { vendor: p.vendor });
           return;
         }
 
         const msg: WsOutputMessage = {
           type: "CHAT_STARTED",
           name: data.profile,
+          serverUrl: "http://localhost:5174/",
           id,
         };
 
-        log("Chat started", { id, profile: data.profile });
+        log("root", "Chat started", { id, profile: data.profile });
         ws.send(JSON.stringify(msg));
+
         return;
       } else if (data.type === "POST_MESSAGE") {
         const c = chats[data.chatId];
 
         if (!c) {
-          log("Error: Chat not found", { chatId: data.chatId });
+          log("root", "Error: Chat not found", { chatId: data.chatId });
           return;
         }
 
         c.chat.postMessage(data.content, data.image);
         return;
       } else {
-        log("Error: Received message is not a valid type", { data });
+        log("root", "Error: Received message is not a valid type", { data });
         return;
       }
     });
@@ -166,18 +234,3 @@ async function main() {
 }
 
 main();
-
-function log(message: string, data?: any) {
-  console.log(`[${new Date().toISOString()}] ${message}`, data);
-}
-
-function asString(message: ws.RawData) {
-  if (message instanceof Buffer) {
-    return message.toString();
-  } else if (typeof message === "string") {
-    return message;
-  } else {
-    log("Error: Received message is not a string");
-    return null;
-  }
-}

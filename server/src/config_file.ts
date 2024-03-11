@@ -3,12 +3,12 @@ import fs from "fs/promises";
 type ConfigFile = {
   openai_key: string;
   anthropic_key: string;
+  projects_dir: string;
   profiles: Record<
     string,
     {
       vendor: "openai" | "anthropic";
       model: string;
-      system: string;
     }
   >;
 };

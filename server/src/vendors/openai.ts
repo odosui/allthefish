@@ -7,7 +7,7 @@ export class OpenAiChat {
   private messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
   private listeners: ((msg: string) => void)[] = [];
-  private finishListeners: (() => void)[] = [];
+  private finishListeners: ((msg: string) => void)[] = [];
 
   constructor(apiKey: string, model: string, systemMsg: string) {
     this.model = model;
@@ -40,15 +40,19 @@ export class OpenAiChat {
     this.messages.push(assistant(msg));
 
     // notify listeners
-    this.finishListeners.forEach((l) => l());
+    this.finishListeners.forEach((l) => l(msg));
   }
 
   onPartialReply(listener: (msg: string) => void) {
     this.listeners.push(listener);
   }
 
-  onReplyFinish(l: () => void) {
+  onReplyFinish(l: (msg: string) => void) {
     this.finishListeners.push(l);
+  }
+
+  getLastMessage() {
+    return this.messages[this.messages.length - 1];
   }
 }
 

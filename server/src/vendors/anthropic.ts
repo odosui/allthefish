@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { MessageParam } from "@anthropic-ai/sdk/resources";
 
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 2048;
 
 function user(
   content: string,
@@ -50,7 +50,7 @@ export class AnthropicChat {
   private system: string;
 
   private listeners: ((msg: string) => void)[] = [];
-  private finishListeners: (() => void)[] = [];
+  private finishListeners: ((msg: string) => void)[] = [];
   private errorListeners: ((err: string) => void)[] = [];
 
   constructor(apiKey: string, model: string, systemMsg: string) {
@@ -81,9 +81,10 @@ export class AnthropicChat {
         }
       })
       .on("end", () => {
-        // notify listeners
-        this.finishListeners.forEach((l) => l());
         this.messages.push(assistant(msg));
+
+        // notify listeners
+        this.finishListeners.forEach((l) => l(msg));
       })
       .on("error", (err) => {
         this.errorListeners.forEach((l) => l(err.message));
@@ -94,11 +95,15 @@ export class AnthropicChat {
     this.listeners.push(listener);
   }
 
-  onReplyFinish(l: () => void) {
+  onReplyFinish(l: (msg: string) => void) {
     this.finishListeners.push(l);
   }
 
   onError(l: (err: string) => void) {
     this.errorListeners.push(l);
+  }
+
+  getLastMessage() {
+    return this.messages[this.messages.length - 1];
   }
 }

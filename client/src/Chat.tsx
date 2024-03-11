@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { WsOutputMessage } from "../../shared/types";
 import { useWs } from "./useWs";
+import { TaskInProgress } from "./TaskInProgress";
 
 type Message = {
   from: "user" | "assistant";
@@ -23,6 +24,13 @@ const Chat: React.FC<{
   const [chatError, setChatError] = useState<string | null>(null);
 
   const { postMessage, lastMessage, readyState } = useWs();
+
+  const [tasks, setTasks] = useState<
+    {
+      id: string;
+      title: string;
+    }[]
+  >([]);
 
   const [file, setFile] = useState<{
     data: string;
@@ -75,6 +83,10 @@ const Chat: React.FC<{
       } else if (msg.type === "CHAT_ERROR") {
         if (msg.chatId !== id) return;
         setChatError(msg.error);
+      } else if (msg.type === "WORKER_TASK_STARTED") {
+        setTasks((prev) => [...prev, { id: msg.id, title: msg.title }]);
+      } else if (msg.type === "WORKER_TASK_FINISHED") {
+        setTasks((prev) => prev.filter((t) => t.id !== msg.id));
       } else {
         // don't care
       }
@@ -102,7 +114,7 @@ const Chat: React.FC<{
   useEffect(() => {
     // scroll to bottom
     messagesRef.current?.scrollTo(0, messagesRef.current?.scrollHeight);
-  }, [messages]);
+  }, [messages, tasks]);
 
   useEffect(() => {
     if (lastMessage !== null) {
@@ -132,6 +144,12 @@ const Chat: React.FC<{
                 />
               </div>
             )}
+          </div>
+        ))}
+
+        {tasks.map((t) => (
+          <div className="chat-task" key={t.id}>
+            <TaskInProgress title={t.title} />
           </div>
         ))}
 

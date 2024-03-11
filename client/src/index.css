@@ -35,6 +35,8 @@
   --color-main: #646cff;
   --color-text: #333;
   --color-text-light: #666;
+  --color-green-bg: #f0fff4;
+  --color-green-border: #c6f6d5;
 }
 
 a {
@@ -73,10 +75,9 @@ button {
 main.app {
   display: flex;
   gap: var(--u3);
-  /* height: 100vh; */
   padding: 0 var(--u3);
   overflow-x: auto;
-  /* width: 100%; */
+  justify-content: space-between;
 
   position: absolute;
   left: 0;
@@ -331,4 +332,51 @@ li p {
 
 .chat-starter ul li button:hover {
   background-color: var(--color-bg-alt);
+}
+
+.preview {
+  flex: 1;
+  margin: var(--u3);
+  border: 2px dashed var(--color-border);
+}
+
+.preview iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.loader {
+  width: var(--u4);
+  height: var(--u4);
+  border: var(--u0) solid var(--color-main);
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.task-in-progress {
+  background-color: var(--color-green-bg);
+  border: 1px solid var(--color-green-border);
+  border-radius: var(--u1);
+  padding: var(--u1) var(--u2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--u2);
+}
+
+.chat-task {
+  margin: var(--u1) var(--u2);
 }

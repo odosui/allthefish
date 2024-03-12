@@ -40,10 +40,10 @@ export const taskFinished = (
   };
 };
 
-export const replyFinished = (id: string): WsOutputMessage => {
+export const autoPilotOff = (id: string): WsOutputMessage => {
   return {
     chatId: id,
-    type: "CHAT_REPLY_FINISH",
+    type: "CHAT_AUTOPILOT_OFF",
   };
 };
 

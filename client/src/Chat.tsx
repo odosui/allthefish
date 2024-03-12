@@ -20,8 +20,7 @@ const Chat: React.FC<{
 }> = ({ id, name }) => {
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [waitingTillReplyFinish, setWaitingTillReplyFinish] =
-    useState<boolean>(false);
+  const [inAutoPilot, setInAutoPilot] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
 
   const { postMessage, lastMessage, readyState } = useWs();
@@ -44,7 +43,7 @@ const Chat: React.FC<{
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
 
-    setWaitingTillReplyFinish(true);
+    setInAutoPilot(true);
     setMessages((prev) => {
       const newMessage: Message = {
         from: "user",
@@ -67,7 +66,7 @@ const Chat: React.FC<{
     (msg: WsOutputMessage) => {
       if (
         msg.type !== "CHAT_PARTIAL_REPLY" &&
-        msg.type !== "CHAT_REPLY_FINISH" &&
+        msg.type !== "CHAT_AUTOPILOT_OFF" &&
         msg.type !== "CHAT_ERROR" &&
         msg.type !== "WORKER_TASK_STARTED" &&
         msg.type !== "WORKER_TASK_FINISHED" &&
@@ -90,8 +89,8 @@ const Chat: React.FC<{
             return [...prev, { from: "assistant", content: msg.content }];
           }
         });
-      } else if (msg.type === "CHAT_REPLY_FINISH") {
-        setWaitingTillReplyFinish(false);
+      } else if (msg.type === "CHAT_AUTOPILOT_OFF") {
+        setInAutoPilot(false);
       } else if (msg.type === "CHAT_ERROR") {
         setChatError(msg.error);
       } else if (msg.type === "WORKER_TASK_STARTED") {
@@ -200,7 +199,7 @@ const Chat: React.FC<{
           <button
             type="submit"
             onClick={handleSendMessage}
-            disabled={!readyState || waitingTillReplyFinish || !!chatError}
+            disabled={!readyState || inAutoPilot || !!chatError}
           >
             ⌘↩
           </button>

@@ -27,7 +27,7 @@ export type WsOutputMessage =
       content: string;
     }
   | {
-      type: "CHAT_REPLY_FINISH";
+      type: "CHAT_AUTOPILOT_OFF";
       chatId: string;
     }
   | {

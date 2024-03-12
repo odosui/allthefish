@@ -11,26 +11,17 @@ import {
   taskTitle,
 } from "./project_worker";
 import { addRestRoutes } from "./rest";
-import { AnthropicChat } from "./vendors/anthropic";
-import { OpenAiChat } from "./vendors/openai";
+import { SYSTEM } from "./templates/vite_react_ts";
 import {
+  autoPilotOff,
   chatError,
   forcedMessage,
   partialReply,
-  replyFinished,
   taskFinished,
   taskStarted,
 } from "./utils/messages";
-
-const SYSTEM = [
-  "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
-  "At any time you can ask to update a specific file. Write UPDATE_FILE <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
-  "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name>. Make sure you start with a new line.",
-  "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
-  "Please be consise, and don't explain anything until asked by a user.",
-  "Consider the following good practices: files should be small, components should be reusable, the code should be clean and easy to understand. In CSS, use CSS variables. Use css variables (--u1, --u2, and so on) for length units.",
-  "You start at `src/App.tsx`.",
-].join("\n");
+import { AnthropicChat } from "./vendors/anthropic";
+import { OpenAiChat } from "./vendors/openai";
 
 const PORT = process.env.PORT || 3000;
 
@@ -46,10 +37,7 @@ export const CHAT_STORE: Record<
 async function main() {
   const config: IConfigFile | null = await ConfigFile.readConfig();
 
-  const wsConnections: Map<string, ws> = new Map();
-
   const app = express();
-
   addRestRoutes(app, config);
 
   const server = app.listen(PORT, () => {
@@ -58,6 +46,8 @@ async function main() {
 
   // Set up WebSocket server
   const wsServer = new ws.Server({ server });
+
+  const wsConnections: Map<string, ws> = new Map();
 
   wsServer.on("connection", (ws) => {
     // register connection
@@ -80,8 +70,6 @@ async function main() {
     }
 
     const handleReplyFinish = async (cid: string, content: string) => {
-      sendAll(replyFinished(cid));
-
       // RUNNING TASKS
       const c = CHAT_STORE[cid];
       if (!c) {
@@ -114,21 +102,18 @@ async function main() {
       // run types
       // ==============
       const tid = v4();
-      const task: WorkerTask = { type: "CHECK_TYPES" };
+      const task: WorkerTask = { type: "CHECK_TYPES", args: [] };
       sendAll(taskStarted(cid, taskTitle(task), tid));
-      const { code, stdout, stderr } = await c.worker.checkTypes();
+      const [success, error] = await c.worker.runTask(task);
       sendAll(taskFinished(cid, tid));
-
-      if (code !== 0) {
-        const msg = `Typescript checking failed with code ${code}. \n\n Stdout: \n\n \`\`\`\n${stdout}\n\`\`\`\n\n Stderr: \n\n \`\`\`\n${stderr}\n\`\`\``;
-        c.chat.postMessage(msg);
-        sendAll(forcedMessage(cid, msg));
-      } else {
-        const msg = "Typescript checking passed.";
-        c.chat.postMessage(msg);
-        sendAll(forcedMessage(cid, msg));
+      if (!success) {
+        c.chat.postMessage(error);
+        sendAll(forcedMessage(cid, error));
       }
+      log("root", "Typescript checking passed", { cid });
       // ==============
+
+      sendAll(autoPilotOff(cid));
     };
 
     async function handleMessageReceived(message: ws.RawData) {
@@ -169,8 +154,10 @@ async function main() {
         }
 
         const ChatEngine = p.vendor === "openai" ? OpenAiChat : AnthropicChat;
+        const apiKey =
+          p.vendor === "openai" ? config.openai_key : config.anthropic_key;
 
-        const chat = new ChatEngine(config.openai_key, p.model, SYSTEM);
+        const chat = new ChatEngine(apiKey, p.model, SYSTEM);
         CHAT_STORE[id] = {
           profile: data.profile,
           chat,

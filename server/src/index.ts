@@ -1,16 +1,26 @@
 import express from "express";
-import ws from "ws";
-import ConfigFile from "./config_file";
-import {
-  ChatSession,
-  WsInputMessage,
-  WsOutputMessage,
-} from "../../shared/types";
 import { v4 } from "uuid";
-import { OpenAiChat } from "./vendors/openai";
-import { AnthropicChat } from "./vendors/anthropic";
+import ws from "ws";
+import { WsInputMessage, WsOutputMessage } from "../../shared/types";
+import ConfigFile, { IConfigFile } from "./config_file";
 import { asString, log } from "./helpers";
-import { ProjectWorker, parseTasks, taskTitle } from "./project_worker";
+import {
+  ProjectWorker,
+  WorkerTask,
+  parseTasks,
+  taskTitle,
+} from "./project_worker";
+import { addRestRoutes } from "./rest";
+import { AnthropicChat } from "./vendors/anthropic";
+import { OpenAiChat } from "./vendors/openai";
+import {
+  chatError,
+  forcedMessage,
+  partialReply,
+  replyFinished,
+  taskFinished,
+  taskStarted,
+} from "./utils/messages";
 
 const SYSTEM = [
   "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
@@ -24,64 +34,23 @@ const SYSTEM = [
 
 const PORT = process.env.PORT || 3000;
 
+export const CHAT_STORE: Record<
+  string,
+  {
+    profile: string;
+    chat: OpenAiChat | AnthropicChat;
+    worker: ProjectWorker;
+  }
+> = {};
+
 async function main() {
-  const config: ConfigFile | null = await ConfigFile.readConfig();
+  const config: IConfigFile | null = await ConfigFile.readConfig();
 
   const wsConnections: Map<string, ws> = new Map();
 
   const app = express();
 
-  const chats: Record<
-    string,
-    {
-      profile: string;
-      chat: OpenAiChat | AnthropicChat;
-      worker: ProjectWorker;
-    }
-  > = {};
-
-  // allow CORS
-  app.use((_req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "http://localhost:5173");
-    res.header("Access-Control-Allow-Headers", "Content-Type");
-    next();
-  });
-
-  // Serve static files or APIs
-  app.get("/", (_req, res) => {
-    res.json({ status: "OK" });
-  });
-
-  app.get("/api/profiles", async (_req, res) => {
-    try {
-      const profiles = Object.keys(config?.profiles || {}).map((name) => ({
-        name,
-        vendor: config?.profiles[name].vendor,
-        model: config?.profiles[name].model,
-      }));
-      res.json(profiles);
-    } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  app.get("/api/chat/:id", async (req, res) => {
-    const id = req.params.id;
-    const chat = chats[id];
-
-    if (!chat) {
-      res.status(404).json({ error: "Chat not found" });
-      return;
-    }
-
-    const data: ChatSession = {
-      id,
-      name: chat.profile,
-      serverUrl: chat.worker.serverUrl(),
-    };
-
-    res.json(data);
-  });
+  addRestRoutes(app, config);
 
   const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
@@ -102,99 +71,75 @@ async function main() {
       wsConnections.delete(conId);
     });
 
+    ws.on("message", handleMessageReceived);
+
     function sendAll(msg: WsOutputMessage) {
       wsConnections.forEach((c) => {
         c.send(JSON.stringify(msg));
       });
     }
 
-    const handlePartialReply = (msg: string, id: string) => {
-      const msgObj: WsOutputMessage = {
-        chatId: id,
-        content: msg,
-        type: "CHAT_PARTIAL_REPLY",
+    const handleReplyFinish = async (cid: string, content: string) => {
+      sendAll(replyFinished(cid));
+
+      // RUNNING TASKS
+      const c = CHAT_STORE[cid];
+      if (!c) {
+        log("root", "Error: Chat not found", { chatId: cid });
+        return;
+      }
+
+      const runAllTasks = async (tasks: WorkerTask[]) => {
+        for await (const task of tasks) {
+          const tid = v4();
+          sendAll(taskStarted(cid, taskTitle(task), tid));
+          await c.worker.runTask(task);
+          sendAll(taskFinished(cid, tid));
+        }
       };
 
-      sendAll(msgObj);
+      const tasks = parseTasks(content);
+
+      const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
+      await runAllTasks(installTasks);
+
+      const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
+      await runAllTasks(otherTasks);
+
+      // #############
+      // THE MAGNIFICENT LOOP
+      // #############
+
+      // ==============
+      // run types
+      // ==============
+      const tid = v4();
+      const task: WorkerTask = { type: "CHECK_TYPES" };
+      sendAll(taskStarted(cid, taskTitle(task), tid));
+      const { code, stdout, stderr } = await c.worker.checkTypes();
+      sendAll(taskFinished(cid, tid));
+
+      if (code !== 0) {
+        const msg = `Typescript checking failed with code ${code}. \n\n Stdout: \n\n \`\`\`\n${stdout}\n\`\`\`\n\n Stderr: \n\n \`\`\`\n${stderr}\n\`\`\``;
+        c.chat.postMessage(msg);
+        sendAll(forcedMessage(cid, msg));
+      } else {
+        const msg = "Typescript checking passed.";
+        c.chat.postMessage(msg);
+        sendAll(forcedMessage(cid, msg));
+      }
+      // ==============
     };
 
-    const handleChatError = (id: string, error: string) => {
-      const msg: WsOutputMessage = {
-        chatId: id,
-        type: "CHAT_ERROR",
-        error,
-      };
-      sendAll(msg);
-    };
-
-    ws.on("message", async (message) => {
+    async function handleMessageReceived(message: ws.RawData) {
       const messageStr = asString(message);
 
       if (messageStr === null) {
+        log("root", "Error: Received message is not a string");
         return;
       }
 
       const data = JSON.parse(messageStr) as WsInputMessage;
-
-      const handleReplyFinish = async (cid: string, content: string) => {
-        const msg: WsOutputMessage = {
-          chatId: cid,
-          type: "CHAT_REPLY_FINISH",
-        };
-        sendAll(msg);
-
-        // let's update files
-        const c = chats[cid];
-        if (!c) {
-          log("root", "Error: Chat not found", { chatId: cid });
-          return;
-        }
-
-        const tasks = parseTasks(content);
-
-        const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
-
-        for await (const task of installTasks) {
-          const taskId = v4();
-          const msg: WsOutputMessage = {
-            chatId: cid,
-            type: "WORKER_TASK_STARTED",
-            title: taskTitle(task),
-            id: taskId,
-          };
-          sendAll(msg);
-
-          await c.worker.runTask(task);
-
-          const msg2: WsOutputMessage = {
-            chatId: cid,
-            type: "WORKER_TASK_FINISHED",
-            id: taskId,
-          };
-          sendAll(msg2);
-        }
-
-        const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
-        for await (const task of otherTasks) {
-          const taskId = v4();
-          const msg: WsOutputMessage = {
-            chatId: cid,
-            type: "WORKER_TASK_STARTED",
-            title: taskTitle(task),
-            id: taskId,
-          };
-          sendAll(msg);
-
-          await c.worker.runTask(task);
-
-          const msg2: WsOutputMessage = {
-            chatId: cid,
-            type: "WORKER_TASK_FINISHED",
-            id: taskId,
-          };
-          sendAll(msg2);
-        }
-      };
 
       if (data.type === "START_CHAT") {
         const p = config?.profiles[data.profile];
@@ -218,31 +163,23 @@ async function main() {
 
         worker.startServer();
 
-        if (p.vendor === "openai") {
-          const chat = new OpenAiChat(config.openai_key, p.model, SYSTEM);
-          chats[id] = {
-            profile: data.profile,
-            chat,
-            worker,
-          };
-
-          chat.onPartialReply((m) => handlePartialReply(m, id));
-          chat.onReplyFinish((msg) => handleReplyFinish(id, msg));
-        } else if (p.vendor === "anthropic") {
-          const chat = new AnthropicChat(config.anthropic_key, p.model, SYSTEM);
-          chats[id] = {
-            profile: data.profile,
-            chat,
-            worker,
-          };
-
-          chat.onPartialReply((m) => handlePartialReply(m, id));
-          chat.onReplyFinish((msg) => handleReplyFinish(id, msg));
-          chat.onError((err) => handleChatError(id, err));
-        } else {
+        if (p.vendor !== "openai" && p.vendor !== "anthropic") {
           log("root", "Error: Vendor not supported", { vendor: p.vendor });
           return;
         }
+
+        const ChatEngine = p.vendor === "openai" ? OpenAiChat : AnthropicChat;
+
+        const chat = new ChatEngine(config.openai_key, p.model, SYSTEM);
+        CHAT_STORE[id] = {
+          profile: data.profile,
+          chat,
+          worker,
+        };
+
+        chat.onPartialReply((m) => sendAll(partialReply(m, id)));
+        chat.onReplyFinish((msg) => handleReplyFinish(id, msg));
+        chat.onError((err) => sendAll(chatError(id, err)));
 
         const msg: WsOutputMessage = {
           type: "CHAT_STARTED",
@@ -256,7 +193,7 @@ async function main() {
 
         return;
       } else if (data.type === "POST_MESSAGE") {
-        const c = chats[data.chatId];
+        const c = CHAT_STORE[data.chatId];
 
         if (!c) {
           log("root", "Error: Chat not found", { chatId: data.chatId });
@@ -269,7 +206,7 @@ async function main() {
         log("root", "Error: Received message is not a valid type", { data });
         return;
       }
-    });
+    }
   });
 }
 

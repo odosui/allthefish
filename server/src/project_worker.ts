@@ -15,6 +15,9 @@ export type WorkerTask =
   | {
       type: "INSTALL_PACKAGE";
       name: string;
+    }
+  | {
+      type: "CHECK_TYPES";
     };
 
 const SCAFFOLDS = {
@@ -36,16 +39,7 @@ export class ProjectWorker {
   async checkTypes() {
     const dir = path.join(this.rootPath, this.dirName);
     log(ACTOR, "Checking types for project", { dir });
-    const { code, stdout, stderr } = await runCmd(
-      dir,
-      "./node_modules/.bin/tsc",
-      ["--noEmit"]
-    );
-
-    console.log(
-      "Result of type check",
-      JSON.stringify({ code, stdout, stderr })
-    );
+    return await runCmd(dir, "./node_modules/.bin/tsc", ["--noEmit"]);
   }
 
   async runTask(task: WorkerTask) {
@@ -56,6 +50,10 @@ export class ProjectWorker {
       // Ensure the directory structure exists
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       await fs.writeFile(filePath, task.content);
+    } else if (task.type === "INSTALL_PACKAGE") {
+      const dir = path.join(this.rootPath, this.dirName);
+      log(ACTOR, "Installing package", { dir, package: task.name });
+      await runCmd(dir, "npm", ["install", task.name]);
     } else {
       log(ACTOR, "Error: Unknown task type", { task });
     }
@@ -114,7 +112,7 @@ export function parseTasks(message: string): WorkerTask[] {
   // Parse INSTALL_PACKAGE tasks
   for (const line of lines) {
     if (line.includes("INSTALL_PACKAGE")) {
-      let name = line.split(":")[1].trim();
+      let name = line.substring(line.indexOf("INSTALL_PACKAGE") + 16).trim();
       if (name.endsWith(".")) {
         name = name.slice(0, -1);
       }
@@ -131,7 +129,7 @@ export function parseTasks(message: string): WorkerTask[] {
   for (const line of lines) {
     if (line.startsWith("UPDATE_FILE")) {
       isInTask = true;
-      path = line.split(":")[1].trim();
+      path = line.substring(line.indexOf("UPDATE_FILE") + 11).trim();
       continue;
     } else if (isInTask) {
       if (inCode) {
@@ -164,6 +162,8 @@ export function taskTitle(task: WorkerTask): string {
     return `Installing package ${task.name}`;
   } else if (task.type === "UPDATE_FILE") {
     return `Updating file ${task.path}`;
+  } else if (task.type === "CHECK_TYPES") {
+    return "Checking types...";
   } else {
     return "Unknown task";
   }

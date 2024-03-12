@@ -31,6 +31,11 @@ export type WsOutputMessage =
       chatId: string;
     }
   | {
+      type: "CHAT_FORCED_MESSAGE";
+      chatId: string;
+      content: string;
+    }
+  | {
       type: "CHAT_ERROR";
       chatId: string;
       error: string;

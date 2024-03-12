@@ -70,7 +70,8 @@ const Chat: React.FC<{
         msg.type !== "CHAT_REPLY_FINISH" &&
         msg.type !== "CHAT_ERROR" &&
         msg.type !== "WORKER_TASK_STARTED" &&
-        msg.type !== "WORKER_TASK_FINISHED"
+        msg.type !== "WORKER_TASK_FINISHED" &&
+        msg.type !== "CHAT_FORCED_MESSAGE"
       ) {
         return;
       }
@@ -97,6 +98,11 @@ const Chat: React.FC<{
         setTasks((prev) => [...prev, { id: msg.id, title: msg.title }]);
       } else if (msg.type === "WORKER_TASK_FINISHED") {
         setTasks((prev) => prev.filter((t) => t.id !== msg.id));
+      } else if (msg.type === "CHAT_FORCED_MESSAGE") {
+        setMessages((prev) => [
+          ...prev,
+          { from: "user", content: msg.content },
+        ]);
       } else {
         // don't care
       }

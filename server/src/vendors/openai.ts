@@ -51,6 +51,11 @@ export class OpenAiChat {
     this.finishListeners.push(l);
   }
 
+  onError(_l: (err: string) => void) {
+    // TODO: implement
+    // this.errorListeners.push(l);
+  }
+
   getLastMessage() {
     return this.messages[this.messages.length - 1];
   }

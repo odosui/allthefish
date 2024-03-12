@@ -11,7 +11,7 @@ export default api;
 
 const BASE_URL = "http://localhost:3000/api";
 
-function get<T>(url: string, params?: { [k: string]: string }): Promise<T> {
+function get<T>(url: string, params?: { [k: string]: string }) {
   let fullUrl = url;
   if (params) {
     const p = new URLSearchParams(params).toString();
@@ -79,5 +79,9 @@ async function apic<T>(method: string, url: string, data?: object) {
   }
 
   const x = await fetch(`${BASE_URL}${url}`, attrs);
-  return x.json() as T;
+  const j = (await x.json()) as T;
+  return {
+    status: x.status,
+    json: j,
+  };
 }

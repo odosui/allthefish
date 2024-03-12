@@ -27,6 +27,7 @@ export function useWs() {
       type: string;
     }
   ) => {
+    console.log("Sending message", message, file);
     const e: WsInputMessage = {
       type: "POST_MESSAGE",
       content: message,

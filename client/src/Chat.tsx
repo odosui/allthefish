@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import { WsOutputMessage } from "../../shared/types";
-import { useWs } from "./useWs";
 import { TaskInProgress } from "./TaskInProgress";
+import { useWs } from "./useWs";
+import { fileToBase64 } from "./utils";
 
 type Message = {
   from: "user" | "assistant";
@@ -64,8 +65,19 @@ const Chat: React.FC<{
 
   const handleWsMessage = useCallback(
     (msg: WsOutputMessage) => {
+      if (
+        msg.type !== "CHAT_PARTIAL_REPLY" &&
+        msg.type !== "CHAT_REPLY_FINISH" &&
+        msg.type !== "CHAT_ERROR" &&
+        msg.type !== "WORKER_TASK_STARTED" &&
+        msg.type !== "WORKER_TASK_FINISHED"
+      ) {
+        return;
+      }
+
+      if (msg.chatId !== id) return;
+
       if (msg.type === "CHAT_PARTIAL_REPLY") {
-        if (msg.chatId !== id) return;
         setMessages((prev) => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg?.from === "assistant") {
@@ -78,10 +90,8 @@ const Chat: React.FC<{
           }
         });
       } else if (msg.type === "CHAT_REPLY_FINISH") {
-        if (msg.chatId !== id) return;
         setWaitingTillReplyFinish(false);
       } else if (msg.type === "CHAT_ERROR") {
-        if (msg.chatId !== id) return;
         setChatError(msg.error);
       } else if (msg.type === "WORKER_TASK_STARTED") {
         setTasks((prev) => [...prev, { id: msg.id, title: msg.title }]);
@@ -203,24 +213,5 @@ const Chat: React.FC<{
     </div>
   );
 };
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        const [, base64] = result.split(",");
-        resolve(base64);
-      } else {
-        reject(new Error("FileReader result is not a string"));
-      }
-    };
-    reader.onerror = () => {
-      reject(reader.error);
-    };
-    reader.readAsDataURL(file);
-  });
-}
 
 export default Chat;

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Profile } from "./App";
 import { useWs } from "./useWs";
 import { TaskInProgress } from "./TaskInProgress";
+import { Profile } from "./pages/Home";
 
 const ChatStarter = ({ profiles }: { profiles: Profile[] }) => {
   const { startChat } = useWs();

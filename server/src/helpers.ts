@@ -5,7 +5,11 @@ const ACTOR = "helper";
 
 export function log(actor: string, message: string, data?: any) {
   const d = new Date().toISOString();
-  console.log(`[${d}] (${actor}) ${message}`, data);
+  if (arguments.length === 2) {
+    console.log(`[${d}] (${actor}) ${message}`);
+  } else {
+    console.log(`[${d}] (${actor}) ${message}`, data);
+  }
 }
 
 export function runBackground(atPath: string, cmd: string, args: string[]) {

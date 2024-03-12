@@ -1,7 +1,11 @@
 import express from "express";
 import ws from "ws";
 import ConfigFile from "./config_file";
-import { WsInputMessage, WsOutputMessage } from "../../shared/types";
+import {
+  ChatSession,
+  WsInputMessage,
+  WsOutputMessage,
+} from "../../shared/types";
 import { v4 } from "uuid";
 import { OpenAiChat } from "./vendors/openai";
 import { AnthropicChat } from "./vendors/anthropic";
@@ -10,7 +14,7 @@ import { ProjectWorker, parseTasks, taskTitle } from "./project_worker";
 
 const SYSTEM = [
   "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
-  "At any time you can ask to update a specific file. Write UPDATE_FILE: <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
+  "At any time you can ask to update a specific file. Write UPDATE_FILE <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
   "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name>. Make sure you start with a new line.",
   "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
   "Please be consise, and don't explain anything until asked by a user.",
@@ -23,7 +27,18 @@ const PORT = process.env.PORT || 3000;
 async function main() {
   const config: ConfigFile | null = await ConfigFile.readConfig();
 
+  const wsConnections: Map<string, ws> = new Map();
+
   const app = express();
+
+  const chats: Record<
+    string,
+    {
+      profile: string;
+      chat: OpenAiChat | AnthropicChat;
+      worker: ProjectWorker;
+    }
+  > = {};
 
   // allow CORS
   app.use((_req, res, next) => {
@@ -50,24 +65,48 @@ async function main() {
     }
   });
 
+  app.get("/api/chat/:id", async (req, res) => {
+    const id = req.params.id;
+    const chat = chats[id];
+
+    if (!chat) {
+      res.status(404).json({ error: "Chat not found" });
+      return;
+    }
+
+    const data: ChatSession = {
+      id,
+      name: chat.profile,
+      serverUrl: chat.worker.serverUrl(),
+    };
+
+    res.json(data);
+  });
+
   const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
-
-  const chats: Record<
-    string,
-    {
-      profile: string;
-      chat: OpenAiChat | AnthropicChat;
-      worker: ProjectWorker;
-    }
-  > = {};
 
   // Set up WebSocket server
   const wsServer = new ws.Server({ server });
 
   wsServer.on("connection", (ws) => {
-    log("root", "New connection");
+    // register connection
+    const conId = v4();
+    wsConnections.set(conId, ws);
+    log("root", "New connection", { conId });
+
+    // deregister connection
+    ws.on("close", () => {
+      log("root", "Connection closed", { conId });
+      wsConnections.delete(conId);
+    });
+
+    function sendAll(msg: WsOutputMessage) {
+      wsConnections.forEach((c) => {
+        c.send(JSON.stringify(msg));
+      });
+    }
 
     const handlePartialReply = (msg: string, id: string) => {
       const msgObj: WsOutputMessage = {
@@ -75,7 +114,8 @@ async function main() {
         content: msg,
         type: "CHAT_PARTIAL_REPLY",
       };
-      ws.send(JSON.stringify(msgObj));
+
+      sendAll(msgObj);
     };
 
     const handleChatError = (id: string, error: string) => {
@@ -84,7 +124,7 @@ async function main() {
         type: "CHAT_ERROR",
         error,
       };
-      ws.send(JSON.stringify(msg));
+      sendAll(msg);
     };
 
     ws.on("message", async (message) => {
@@ -101,7 +141,7 @@ async function main() {
           chatId: cid,
           type: "CHAT_REPLY_FINISH",
         };
-        ws.send(JSON.stringify(msg));
+        sendAll(msg);
 
         // let's update files
         const c = chats[cid];
@@ -122,7 +162,7 @@ async function main() {
             title: taskTitle(task),
             id: taskId,
           };
-          ws.send(JSON.stringify(msg));
+          sendAll(msg);
 
           await c.worker.runTask(task);
 
@@ -131,7 +171,7 @@ async function main() {
             type: "WORKER_TASK_FINISHED",
             id: taskId,
           };
-          ws.send(JSON.stringify(msg2));
+          sendAll(msg2);
         }
 
         const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
@@ -143,7 +183,7 @@ async function main() {
             title: taskTitle(task),
             id: taskId,
           };
-          ws.send(JSON.stringify(msg));
+          sendAll(msg);
 
           await c.worker.runTask(task);
 
@@ -152,7 +192,7 @@ async function main() {
             type: "WORKER_TASK_FINISHED",
             id: taskId,
           };
-          ws.send(JSON.stringify(msg2));
+          sendAll(msg2);
         }
       };
 

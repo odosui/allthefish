@@ -50,3 +50,9 @@ export type WsOutputMessage =
       chatId: string;
       id: string;
     };
+
+export type ChatSession = {
+  id: string;
+  name: string;
+  serverUrl: string;
+};

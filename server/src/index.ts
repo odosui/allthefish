@@ -4,13 +4,7 @@ import ws from "ws";
 import { WsInputMessage, WsOutputMessage } from "../../shared/types";
 import ConfigFile, { IConfigFile } from "./config_file";
 import { asString, log } from "./helpers";
-import {
-  TemplateName,
-  ProjectWorker,
-  WorkerTask,
-  parseTasks,
-  taskTitle,
-} from "./project_worker";
+import { ProjectWorker, TemplateName, WorkerTask } from "./project_worker";
 import { addRestRoutes } from "./rest";
 import {
   autoPilotOff,
@@ -38,6 +32,12 @@ export const PROJECTS: Record<string, Project> = {
     name: "candl",
     dirname: "candl",
     template: "rails",
+  },
+  mytest: {
+    id: "mytest",
+    name: "mytest",
+    dirname: "mytest",
+    template: "vite:react-ts",
   },
 };
 
@@ -97,13 +97,13 @@ async function main() {
       const runAllTasks = async (tasks: WorkerTask[]) => {
         for await (const task of tasks) {
           const tid = v4();
-          sendAll(taskStarted(cid, taskTitle(task), tid));
+          sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
           await c.worker.runTask(task);
           sendAll(taskFinished(cid, tid));
         }
       };
 
-      const tasks = parseTasks(content);
+      const tasks = c.worker.parseTasks(content);
 
       // TODO: we need to implement priority
       const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
@@ -119,7 +119,7 @@ async function main() {
       const lTasks = c.worker.loopTasks();
       for await (const task of lTasks) {
         const tid = v4();
-        sendAll(taskStarted(cid, taskTitle(task), tid));
+        sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
         const [success, error] = await c.worker.runTask(task);
         sendAll(taskFinished(cid, tid));
         if (!success) {

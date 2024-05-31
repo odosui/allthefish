@@ -97,14 +97,6 @@ export type WorkerTask = {
   args: string[];
 };
 
-export function taskTitle(task: WorkerTask): string {
-  const def = COMMON_TASK_DEFS[task.type];
-  if (!def) {
-    return "Unknown task";
-  }
-  return def.title(task);
-}
-
 export class ProjectWorker {
   private rootPath = "";
   private dirName = "";
@@ -130,11 +122,13 @@ export class ProjectWorker {
     this.template = template;
   }
 
-  async runTask(task: WorkerTask): Promise<[true, null] | [false, string]> {
+  allTaskDefs() {
     const defs = TEMPLATES[this.template].taskDefs;
-    const tasksDefs = { ...COMMON_TASK_DEFS, ...defs };
+    return { ...COMMON_TASK_DEFS, ...defs };
+  }
 
-    const def = tasksDefs[task.type];
+  async runTask(task: WorkerTask): Promise<[true, null] | [false, string]> {
+    const def = this.allTaskDefs()[task.type];
     if (!def) {
       log(ACTOR, "Error: Unknown task type", { task });
       return [false, "Unknown task type"];
@@ -180,8 +174,10 @@ export class ProjectWorker {
   }
 
   loopTasks() {
-    return Object.keys(COMMON_TASK_DEFS)
-      .filter((k) => COMMON_TASK_DEFS[k]?.isLoop)
+    const defs = this.allTaskDefs();
+
+    return Object.keys(defs)
+      .filter((k) => defs[k]?.isLoop)
       .map((k) => {
         return { type: k, args: [] };
       });
@@ -190,16 +186,27 @@ export class ProjectWorker {
   getSystemMessage() {
     return TEMPLATES[this.template].system;
   }
-}
 
-export function parseTasks(message: string): WorkerTask[] {
-  const out: WorkerTask[] = [];
+  parseTasks(message: string): WorkerTask[] {
+    const defs = this.allTaskDefs();
+    const out: WorkerTask[] = [];
 
-  Object.values(COMMON_TASK_DEFS).forEach((def) => {
-    out.push(...def.extract(message));
-  });
+    Object.values(defs).forEach((def) => {
+      out.push(...def.extract(message));
+    });
 
-  return out;
+    return out;
+  }
+
+  taskTitle(task: WorkerTask): string {
+    const defs = this.allTaskDefs();
+
+    const def = defs[task.type];
+    if (!def) {
+      return "Unknown task";
+    }
+    return def.title(task);
+  }
 }
 
 async function initGit(dir: string) {

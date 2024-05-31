@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { WsOutputMessage } from "../../../shared/types";
-import ChatStarter from "../ChatStarter";
 import api from "../api";
 import { useWs } from "../useWs";
-import { useNavigate } from "react-router-dom";
 
 export type Profile = {
   name: string;
@@ -11,8 +10,14 @@ export type Profile = {
   model: string;
 };
 
+export type Project = {
+  id: string;
+  name: string;
+  full_path: string;
+};
+
 function HomePage() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const navigate = useNavigate();
 
@@ -31,17 +36,24 @@ function HomePage() {
   }, [lastMessage, navigate]);
 
   useEffect(() => {
-    async function fetchProfiles() {
-      const { json } = await api.get<Profile[]>("/profiles");
-      setProfiles(json);
+    async function fetchProjects() {
+      const { json } = await api.get<Project[]>("/projects");
+      setProjects(json);
     }
 
-    fetchProfiles();
+    fetchProjects();
   }, []);
 
   return (
-    <main className={`app no-chats`}>
-      {profiles && <ChatStarter profiles={profiles} />}
+    <main className="app no-chats">
+      {projects.map((p) => (
+        <div key={p.id}>
+          <h3>
+            <Link to={`/p/${p.id}`}>{p.name}</Link>
+          </h3>
+          <p>{p.full_path}</p>
+        </div>
+      ))}
     </main>
   );
 }

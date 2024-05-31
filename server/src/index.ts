@@ -5,13 +5,13 @@ import { WsInputMessage, WsOutputMessage } from "../../shared/types";
 import ConfigFile, { IConfigFile } from "./config_file";
 import { asString, log } from "./helpers";
 import {
+  TemplateName,
   ProjectWorker,
   WorkerTask,
   parseTasks,
   taskTitle,
 } from "./project_worker";
 import { addRestRoutes } from "./rest";
-import { SYSTEM } from "./templates/vite_react_ts";
 import {
   autoPilotOff,
   chatError,
@@ -25,12 +25,29 @@ import { OpenAiChat } from "./vendors/openai";
 
 const PORT = process.env.PORT || 3000;
 
+type Project = {
+  id: string;
+  name: string;
+  dirname: string;
+  template: TemplateName;
+};
+
+export const PROJECTS: Record<string, Project> = {
+  candl: {
+    id: "candl",
+    name: "candl",
+    dirname: "candl",
+    template: "rails",
+  },
+};
+
 export const CHAT_STORE: Record<
   string,
   {
     profile: string;
     chat: OpenAiChat | AnthropicChat;
     worker: ProjectWorker;
+    proectId: string;
   }
 > = {};
 
@@ -88,6 +105,7 @@ async function main() {
 
       const tasks = parseTasks(content);
 
+      // TODO: we need to implement priority
       const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
       await runAllTasks(installTasks);
 
@@ -98,20 +116,19 @@ async function main() {
       // THE MAGNIFICENT LOOP
       // #############
 
-      // ==============
-      // run types
-      // ==============
-      const tid = v4();
-      const task: WorkerTask = { type: "CHECK_TYPES", args: [] };
-      sendAll(taskStarted(cid, taskTitle(task), tid));
-      const [success, error] = await c.worker.runTask(task);
-      sendAll(taskFinished(cid, tid));
-      if (!success) {
-        c.chat.postMessage(error);
-        sendAll(forcedMessage(cid, error));
+      const lTasks = c.worker.loopTasks();
+      for await (const task of lTasks) {
+        const tid = v4();
+        sendAll(taskStarted(cid, taskTitle(task), tid));
+        const [success, error] = await c.worker.runTask(task);
+        sendAll(taskFinished(cid, tid));
+        if (!success) {
+          log("root", "Error: Loop task failed", { task, cid });
+          c.chat.postMessage(error);
+          sendAll(forcedMessage(cid, error));
+          return;
+        }
       }
-      log("root", "Typescript checking passed", { cid });
-      // ==============
 
       sendAll(autoPilotOff(cid));
     };
@@ -134,17 +151,31 @@ async function main() {
           return;
         }
 
-        const id = v4();
-        const worker = new ProjectWorker(config.projects_dir, data.dir, 3001);
+        const project = PROJECTS[data.projectId];
 
-        const createRes = await worker.createProject();
-
-        if (createRes === "EXISTS") {
-          log("root", "Error: Project already exists", {
-            dir: config.projects_dir,
+        if (!project) {
+          log("root", "Error: Project not found", {
+            projectId: data.projectId,
           });
           return;
         }
+
+        const id = v4();
+        const worker = new ProjectWorker(
+          config.projects_dir,
+          project.dirname,
+          3001,
+          project.template
+        );
+
+        // const createRes = await worker.createProject();
+
+        // if (createRes === "EXISTS") {
+        //   log("root", "Error: Project already exists", {
+        //     dir: config.projects_dir,
+        //   });
+        //   return;
+        // }
 
         worker.startServer();
 
@@ -157,11 +188,15 @@ async function main() {
         const apiKey =
           p.vendor === "openai" ? config.openai_key : config.anthropic_key;
 
-        const chat = new ChatEngine(apiKey, p.model, SYSTEM);
+        const system = worker.getSystemMessage();
+        log("root", "Starting chat", { system });
+
+        const chat = new ChatEngine(apiKey, p.model, system);
         CHAT_STORE[id] = {
           profile: data.profile,
           chat,
           worker,
+          proectId: data.projectId,
         };
 
         chat.onPartialReply((m) => sendAll(partialReply(m, id)));

@@ -1,26 +1,38 @@
+import { ChildProcess } from "child_process";
 import fs from "fs/promises";
 import path from "path";
-import { log, runBackground, runCmd } from "./helpers";
-import { ChildProcess } from "child_process";
-import { scaffold as scaffoldViteReactTs } from "./templates/vite_react_ts";
+import { log, runCmd } from "./helpers";
+import rails from "./templates/rails";
+import { Template } from "./templates/template";
+import viteReactTs from "./templates/vite_react_ts";
+
+export type TemplateName = "vite:react-ts" | "rails";
+
+// templates should be registered here
+const TEMPLATES: Record<TemplateName, Template> = {
+  "vite:react-ts": viteReactTs,
+  rails: rails,
+};
 
 const ACTOR = "projworker";
 
-type TaskContext = {
+export type TaskContext = {
   rootPath: string;
   dirName: string;
 };
 
-type TaskDef = {
+export type TaskDef = {
   extract: (line: string) => WorkerTask[];
   run: (
     ctx: TaskContext,
     task: WorkerTask
   ) => Promise<[true, null] | [false, string]>;
   title: (task: WorkerTask) => string;
+  isExposedToAi: boolean;
+  isLoop: boolean;
 };
 
-const TASK_DEFS: Record<string, TaskDef> = {
+const COMMON_TASK_DEFS: Record<string, TaskDef> = {
   UPDATE_FILE: {
     extract: (line: string) => {
       const out: WorkerTask[] = [];
@@ -75,101 +87,8 @@ const TASK_DEFS: Record<string, TaskDef> = {
       return [true, null];
     },
     title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
-  },
-  INSTALL_PACKAGE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse INSTALL_PACKAGE tasks
-      for (const line of lines) {
-        if (line.includes("INSTALL_PACKAGE")) {
-          let name = line
-            .substring(line.indexOf("INSTALL_PACKAGE") + 16)
-            .trim();
-          out.push({ type: "INSTALL_PACKAGE", args: [name] });
-        }
-      }
-
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      const name = task.args[0];
-      if (!name) {
-        return [false, "Misformed task"];
-      }
-
-      log(ACTOR, "Installing package", { dir, package: name });
-      const { code, stdout, stderr } = await runCmd(dir, "npm", [
-        "install",
-        name,
-      ]);
-      log(ACTOR, "Package installation", { code, stdout, stderr });
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Installing package ${task.args[0]}`,
-  },
-  INSTALL_DEV_PACKAGE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse INSTALL_PACKAGE tasks
-      for (const line of lines) {
-        if (line.includes("INSTALL_DEV_PACKAGE")) {
-          let name = line
-            .substring(line.indexOf("INSTALL_DEV_PACKAGE") + 16)
-            .trim();
-          out.push({ type: "INSTALL_DEV_PACKAGE", args: [name] });
-        }
-      }
-
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      const name = task.args[0];
-      if (!name) {
-        return [false, "Misformed task"];
-      }
-
-      log(ACTOR, "Installing dev package", { dir, package: name });
-      const { code, stdout, stderr } = await runCmd(dir, "npm", [
-        "install",
-        name,
-        "--save-dev",
-      ]);
-      log(ACTOR, "Dev package installation", { code, stdout, stderr });
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Installing dev package ${task.args[0]}`,
-  },
-  CHECK_TYPES: {
-    extract: (_line: string) => {
-      // not applicable
-      return [];
-    },
-    run: async (ctx: TaskContext, _task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      log(ACTOR, "Checking types for project", { dir });
-      const { code, stdout, stderr } = await runCmd(
-        dir,
-        "./node_modules/.bin/tsc",
-        ["--noEmit"]
-      );
-      if (code !== 0) {
-        const msg = `Typescript checking failed with code ${code}. \n\n Stdout: \n\n \`\`\`\n${stdout}\n\`\`\`\n\n Stderr: \n\n \`\`\`\n${stderr}\n\`\`\``;
-        log(ACTOR, "Typescript checking failed", { msg });
-        return [false, msg];
-      } else {
-        log(ACTOR, "Typescript checking passed");
-        return [true, null];
-      }
-    },
-    title: (_task: WorkerTask) => `Checking types...`,
+    isExposedToAi: true,
+    isLoop: false,
   },
 };
 
@@ -178,12 +97,8 @@ export type WorkerTask = {
   args: string[];
 };
 
-const SCAFFOLDS = {
-  "vite:react-ts": scaffoldViteReactTs,
-};
-
 export function taskTitle(task: WorkerTask): string {
-  const def = TASK_DEFS[task.type];
+  const def = COMMON_TASK_DEFS[task.type];
   if (!def) {
     return "Unknown task";
   }
@@ -194,16 +109,32 @@ export class ProjectWorker {
   private rootPath = "";
   private dirName = "";
   private port = 0;
+  private template: TemplateName;
   protected serverProcess: ChildProcess | null = null;
 
-  constructor(rootPath: string, dirName: string, port: number) {
+  constructor(
+    rootPath: string,
+    dirName: string,
+    port: number,
+    template: TemplateName
+  ) {
+    log(ACTOR, "Creating project worker", {
+      rootPath,
+      dirName,
+      port,
+      template,
+    });
     this.rootPath = rootPath;
     this.dirName = dirName;
     this.port = port;
+    this.template = template;
   }
 
   async runTask(task: WorkerTask): Promise<[true, null] | [false, string]> {
-    const def = TASK_DEFS[task.type];
+    const defs = TEMPLATES[this.template].taskDefs;
+    const tasksDefs = { ...COMMON_TASK_DEFS, ...defs };
+
+    const def = tasksDefs[task.type];
     if (!def) {
       log(ACTOR, "Error: Unknown task type", { task });
       return [false, "Unknown task type"];
@@ -213,19 +144,16 @@ export class ProjectWorker {
   }
 
   startServer() {
-    const dir = path.join(this.rootPath, this.dirName);
-    log(ACTOR, "Starting project worker");
-    this.serverProcess = runBackground(dir, "npm", [
-      "run",
-      "dev",
-      "--",
-      "--port",
-      this.port.toString(),
-    ]);
+    log(ACTOR, "Starting the project in the background...");
+    this.serverProcess = TEMPLATES[this.template].startServer(
+      this.rootPath,
+      this.dirName,
+      this.port
+    );
   }
 
   async createProject(
-    template: "vite:react-ts" = "vite:react-ts"
+    template: TemplateName
   ): Promise<"OK" | "EXISTS" | "UNKNOWN_TEMPLATE"> {
     const rootPath = this.rootPath;
     const dirName = this.dirName;
@@ -240,11 +168,7 @@ export class ProjectWorker {
       return "EXISTS";
     }
 
-    const scaffold = SCAFFOLDS[template];
-    if (!scaffold) {
-      log(ACTOR, "Error: Unknown template", { template });
-      return "UNKNOWN_TEMPLATE";
-    }
+    const scaffold = TEMPLATES[template].scaffold;
     log(ACTOR, "Creating project using template", { template });
     await scaffold(rootPath, dirName);
     await initGit(dir);
@@ -254,12 +178,24 @@ export class ProjectWorker {
   serverUrl() {
     return `http://localhost:${this.port}`;
   }
+
+  loopTasks() {
+    return Object.keys(COMMON_TASK_DEFS)
+      .filter((k) => COMMON_TASK_DEFS[k]?.isLoop)
+      .map((k) => {
+        return { type: k, args: [] };
+      });
+  }
+
+  getSystemMessage() {
+    return TEMPLATES[this.template].system;
+  }
 }
 
 export function parseTasks(message: string): WorkerTask[] {
   const out: WorkerTask[] = [];
 
-  Object.values(TASK_DEFS).forEach((def) => {
+  Object.values(COMMON_TASK_DEFS).forEach((def) => {
     out.push(...def.extract(message));
   });
 

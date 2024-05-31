@@ -11,7 +11,7 @@ export type WsInputMessage =
   | {
       type: "START_CHAT";
       profile: string;
-      dir: string;
+      projectId: string;
     };
 
 export type WsOutputMessage =

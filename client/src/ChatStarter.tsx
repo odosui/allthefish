@@ -3,16 +3,22 @@ import { useWs } from "./useWs";
 import { TaskInProgress } from "./TaskInProgress";
 import { Profile } from "./pages/Home";
 
-const ChatStarter = ({ profiles }: { profiles: Profile[] }) => {
+const ChatStarter = ({
+  profiles,
+  projectId,
+}: {
+  profiles: Profile[];
+  projectId: string;
+}) => {
   const { startChat } = useWs();
   const [waiting, setWaiting] = useState(false);
-  const [name, setName] = useState("");
+  // const [name, setName] = useState("");
 
   const handleStartChat = (profile: string) => {
-    if (!name) {
-      return;
-    }
-    startChat(name, profile);
+    // if (!name) {
+    //   return;
+    // }
+    startChat(projectId, profile);
     setWaiting(true);
   };
 
@@ -20,17 +26,11 @@ const ChatStarter = ({ profiles }: { profiles: Profile[] }) => {
     <div className="chat-starter">
       {!waiting && (
         <>
-          <input
-            type="text"
-            placeholder="Directory name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
           <ul>
-            {profiles.map((profile) => (
-              <li key={profile.name}>
-                <button onClick={() => handleStartChat(profile.name)}>
-                  {profile.name}
+            {profiles.map((p) => (
+              <li key={p.name}>
+                <button onClick={() => handleStartChat(p.name)}>
+                  {p.name}
                 </button>
               </li>
             ))}

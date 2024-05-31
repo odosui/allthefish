@@ -35,63 +35,6 @@ async function scaffold(rootPath: string, dirName: string) {
 }
 
 const TASK_DEFS: Record<string, TaskDef> = {
-  UPDATE_FILE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse UPDATE_FILE tasks
-      let isInTask = false;
-      let path = "";
-      let inCode = false;
-      let code = "";
-
-      for (const line of lines) {
-        if (line.startsWith("UPDATE_FILE")) {
-          isInTask = true;
-          path = line.substring(line.indexOf("UPDATE_FILE") + 11).trim();
-          continue;
-        } else if (isInTask) {
-          if (inCode) {
-            if (line.startsWith("```")) {
-              out.push({
-                type: "UPDATE_FILE",
-                args: [path, code],
-              });
-              code = "";
-              inCode = false;
-              isInTask = false;
-              path = "";
-            } else {
-              code += line + "\n";
-            }
-          } else {
-            if (line.startsWith("```")) {
-              inCode = true;
-            }
-          }
-        }
-      }
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const [p, content] = task.args;
-      if (!p || !content) {
-        return [false, "Misformed task"];
-      }
-      const filePath = path.join(ctx.rootPath, ctx.dirName, p);
-      log(ACTOR, "Updating file", { filePath });
-
-      // Ensure the directory structure exists
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, content);
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
-    isExposedToAi: true,
-    isLoop: false,
-  },
   INSTALL_PACKAGE: {
     extract: (line: string) => {
       const out: WorkerTask[] = [];

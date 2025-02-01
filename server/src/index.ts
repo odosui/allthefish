@@ -14,8 +14,8 @@ import {
   taskFinished,
   taskStarted,
 } from "./utils/messages";
-import { AnthropicChat } from "./vendors/anthropic";
-import { OpenAiChat } from "./vendors/openai";
+import { AnthropicChat } from "../../../multichatai/server/src/vendors/anthropic";
+import { OpenAiChat } from "../../../multichatai/server/src/vendors/openai";
 
 const PORT = process.env.PORT || 3000;
 
@@ -23,6 +23,7 @@ type Project = {
   id: string;
   name: string;
   dirname: string;
+  port: number;
   template: TemplateName;
 };
 
@@ -30,14 +31,16 @@ export const PROJECTS: Record<string, Project> = {
   candl: {
     id: "candl",
     name: "candl",
-    dirname: "candl",
+    dirname: "candl/app",
     template: "rails",
+    port: 3003,
   },
   mytest: {
     id: "mytest",
     name: "mytest",
     dirname: "mytest",
     template: "vite:react-ts",
+    port: 3001,
   },
 };
 
@@ -164,20 +167,20 @@ async function main() {
         const worker = new ProjectWorker(
           config.projects_dir,
           project.dirname,
-          3001,
+          project.port,
           project.template
         );
 
-        // const createRes = await worker.createProject();
+        const createRes = await worker.createProject();
 
-        // if (createRes === "EXISTS") {
-        //   log("root", "Error: Project already exists", {
-        //     dir: config.projects_dir,
-        //   });
-        //   return;
-        // }
+        if (createRes === "EXISTS") {
+          log("root", "Error: Project already exists", {
+            dir: config.projects_dir,
+          });
+          return;
+        }
 
-        worker.startServer();
+        worker.startApplication();
 
         if (p.vendor !== "openai" && p.vendor !== "anthropic") {
           log("root", "Error: Vendor not supported", { vendor: p.vendor });

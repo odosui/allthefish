@@ -2,6 +2,7 @@ import { ChildProcess } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { log, runCmd } from "./helpers";
+import { TaskContext, TaskDef, UPDATE_FILE } from "./templates/common_tasks";
 import rails from "./templates/rails";
 import { Template } from "./templates/template";
 import viteReactTs from "./templates/vite_react_ts";
@@ -16,80 +17,8 @@ const TEMPLATES: Record<TemplateName, Template> = {
 
 const ACTOR = "projworker";
 
-export type TaskContext = {
-  rootPath: string;
-  dirName: string;
-};
-
-export type TaskDef = {
-  extract: (line: string) => WorkerTask[];
-  run: (
-    ctx: TaskContext,
-    task: WorkerTask
-  ) => Promise<[true, null] | [false, string]>;
-  title: (task: WorkerTask) => string;
-  isExposedToAi: boolean;
-  isLoop: boolean;
-};
-
 const COMMON_TASK_DEFS: Record<string, TaskDef> = {
-  UPDATE_FILE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse UPDATE_FILE tasks
-      let isInTask = false;
-      let path = "";
-      let inCode = false;
-      let code = "";
-
-      for (const line of lines) {
-        if (line.startsWith("UPDATE_FILE")) {
-          isInTask = true;
-          path = line.substring(line.indexOf("UPDATE_FILE") + 11).trim();
-          continue;
-        } else if (isInTask) {
-          if (inCode) {
-            if (line.startsWith("```")) {
-              out.push({
-                type: "UPDATE_FILE",
-                args: [path, code],
-              });
-              code = "";
-              inCode = false;
-              isInTask = false;
-              path = "";
-            } else {
-              code += line + "\n";
-            }
-          } else {
-            if (line.startsWith("```")) {
-              inCode = true;
-            }
-          }
-        }
-      }
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const [p, content] = task.args;
-      if (!p || !content) {
-        return [false, "Misformed task"];
-      }
-      const filePath = path.join(ctx.rootPath, ctx.dirName, p);
-      log(ACTOR, "Updating file", { filePath });
-
-      // Ensure the directory structure exists
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, content);
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
-    isExposedToAi: true,
-    isLoop: false,
-  },
+  UPDATE_FILE,
 };
 
 export type WorkerTask = {
@@ -137,18 +66,16 @@ export class ProjectWorker {
     return await def.run(ctx, task);
   }
 
-  startServer() {
+  startApplication() {
     log(ACTOR, "Starting the project in the background...");
-    this.serverProcess = TEMPLATES[this.template].startServer(
+    this.serverProcess = TEMPLATES[this.template].startApplication(
       this.rootPath,
       this.dirName,
       this.port
     );
   }
 
-  async createProject(
-    template: TemplateName
-  ): Promise<"OK" | "EXISTS" | "UNKNOWN_TEMPLATE"> {
+  async createProject(): Promise<"OK" | "EXISTS" | "UNKNOWN_TEMPLATE"> {
     const rootPath = this.rootPath;
     const dirName = this.dirName;
     const dir = path.join(rootPath, dirName);
@@ -162,8 +89,8 @@ export class ProjectWorker {
       return "EXISTS";
     }
 
-    const scaffold = TEMPLATES[template].scaffold;
-    log(ACTOR, "Creating project using template", { template });
+    const scaffold = TEMPLATES[this.template].scaffold;
+    log(ACTOR, "Creating project using template", { template: this.template });
     await scaffold(rootPath, dirName);
     await initGit(dir);
     return "OK";

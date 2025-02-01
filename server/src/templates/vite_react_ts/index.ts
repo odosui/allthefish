@@ -1,20 +1,32 @@
 import fs from "fs/promises";
 import path from "path";
-import { log, runBackground, runCmd } from "../../helpers";
-import { TaskContext, TaskDef, WorkerTask } from "../../project_worker";
+import { runBackground, runCmd } from "../../helpers";
+import {
+  NPM_INSTALL_DEV_PACKAGE,
+  NPM_INSTALL_PACKAGE,
+  TS_CHECK_TYPES,
+  TaskDef,
+} from "../common_tasks";
 import { Template } from "../template";
 
-const ACTOR = "VITE_REACT_TS";
-
-const SYSTEM = [
+const SYSTEM_MSG = [
+  // intro
   "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
+  // short files
   "Whatever files you create/update, make sure they are as small as possible. It's better to have multiple small files than a single large file.",
+  // UPDATE_FILE to update files
   "At any time you can ask to update a specific file. Write UPDATE_FILE <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
+  // INSTALL_PACKAGE to install npm packages
   "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name> (or INSTALL_DEV_PACKAGE to use --save-dev). Make sure you start with a new line.",
+  // PROVIDE_SCREENSHOT to ask for a screenshot
   "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
+  // Be concise
   "Please be consise, and don't explain anything until asked by a user.",
+  // Good practices
   "Consider the following good practices: files should be small, components should be reusable, the code should be clean and easy to understand. In CSS, use CSS variables. Use css variables (--u1, --u2, and so on) for length units.",
+  // Code blocks
   "Don't forget to use ``` for code blocks.",
+  // Start point
   "You start at `src/App.tsx`.",
 ].join("\n");
 
@@ -37,110 +49,12 @@ async function scaffold(rootPath: string, dirName: string) {
 }
 
 const TASK_DEFS: Record<string, TaskDef> = {
-  INSTALL_PACKAGE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse INSTALL_PACKAGE tasks
-      for (const line of lines) {
-        if (line.includes("INSTALL_PACKAGE")) {
-          let name = line
-            .substring(line.indexOf("INSTALL_PACKAGE") + 16)
-            .trim();
-          out.push({ type: "INSTALL_PACKAGE", args: [name] });
-        }
-      }
-
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      const name = task.args[0];
-      if (!name) {
-        return [false, "Misformed task"];
-      }
-
-      log(ACTOR, "Installing package", { dir, package: name });
-      const { code, stdout, stderr } = await runCmd(dir, "npm", [
-        "install",
-        name,
-      ]);
-      log(ACTOR, "Package installation", { code, stdout, stderr });
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Installing package ${task.args[0]}`,
-    isExposedToAi: true,
-    isLoop: false,
-  },
-  INSTALL_DEV_PACKAGE: {
-    extract: (line: string) => {
-      const out: WorkerTask[] = [];
-
-      const lines = line.split("\n");
-
-      // Parse INSTALL_PACKAGE tasks
-      for (const line of lines) {
-        if (line.includes("INSTALL_DEV_PACKAGE")) {
-          let name = line
-            .substring(line.indexOf("INSTALL_DEV_PACKAGE") + 20)
-            .trim();
-          out.push({ type: "INSTALL_DEV_PACKAGE", args: [name] });
-        }
-      }
-
-      return out;
-    },
-    run: async (ctx: TaskContext, task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      const name = task.args[0];
-      if (!name) {
-        return [false, "Misformed task"];
-      }
-
-      log(ACTOR, "Installing dev package", { dir, package: name });
-      const { code, stdout, stderr } = await runCmd(dir, "npm", [
-        "install",
-        name,
-        "--save-dev",
-      ]);
-      log(ACTOR, "Dev package installation", { code, stdout, stderr });
-      return [true, null];
-    },
-    title: (task: WorkerTask) => `Installing dev package ${task.args[0]}`,
-    isExposedToAi: true,
-    isLoop: false,
-  },
-  CHECK_TYPES: {
-    extract: (_line: string) => {
-      // not applicable
-      return [];
-    },
-    run: async (ctx: TaskContext, _task: WorkerTask) => {
-      const dir = path.join(ctx.rootPath, ctx.dirName);
-      log(ACTOR, "Checking types for project", { dir });
-      const { code, stdout, stderr } = await runCmd(
-        dir,
-        "./node_modules/.bin/tsc",
-        ["--noEmit"]
-      );
-      if (code !== 0) {
-        const msg = `Typescript checking failed with code ${code}. \n\n Stdout: \n\n \`\`\`\n${stdout}\n\`\`\`\n\n Stderr: \n\n \`\`\`\n${stderr}\n\`\`\``;
-        log(ACTOR, "Typescript checking failed", { msg });
-        return [false, msg];
-      } else {
-        log(ACTOR, "Typescript checking passed");
-        return [true, null];
-      }
-    },
-    title: (_task: WorkerTask) => `Checking types...`,
-    isExposedToAi: false,
-    isLoop: true,
-  },
+  INSTALL_PACKAGE: NPM_INSTALL_PACKAGE,
+  INSTALL_DEV_PACKAGE: NPM_INSTALL_DEV_PACKAGE,
+  CHECK_TYPES: TS_CHECK_TYPES,
 };
 
-function startServer(rootPath: string, dirName: string, port: number) {
+function startApplication(rootPath: string, dirName: string, port: number) {
   const dir = path.join(rootPath, dirName);
   return runBackground(dir, "npm", [
     "run",
@@ -152,10 +66,10 @@ function startServer(rootPath: string, dirName: string, port: number) {
 }
 
 const t: Template = {
-  system: SYSTEM,
+  system: SYSTEM_MSG,
   scaffold: scaffold,
   taskDefs: TASK_DEFS,
-  startServer: startServer,
+  startApplication,
 };
 
 export default t;

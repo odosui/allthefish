@@ -106,7 +106,7 @@ const Chat: React.FC<{
         // don't care
       }
     },
-    [id]
+    [id],
   );
 
   const handleAttachImage = async (e: React.MouseEvent) => {
@@ -143,6 +143,10 @@ const Chat: React.FC<{
       <div className="chat-title">{name}</div>
 
       <div className="messages" ref={messagesRef}>
+        {messages?.length === 0 && (
+          <div className="placeholder">You agent ({name}) is ready 🤖</div>
+        )}
+
         {messages.map((m, i) => (
           <div key={i} className={`message ${m.from}`}>
             <div className="from">

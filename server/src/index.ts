@@ -110,13 +110,15 @@ async function main() {
       }
 
       const runAllTasks = async (tasks: WorkerTask[]) => {
-        console.log("running tasks", tasks);
+        const results = [];
         for await (const task of tasks) {
           const tid = v4();
           sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
-          await c.worker.runTask(task);
+          const res = await c.worker.runTask(task);
+          results.push(res);
           sendAll(taskFinished(cid, tid));
         }
+        return results;
       };
 
       const tasks = c.worker.parseTasks(content);
@@ -128,7 +130,18 @@ async function main() {
       await runAllTasks(installTasks);
 
       const otherTasks = tasks.filter((t) => t.type !== NPM_INSTALL_CMD);
-      await runAllTasks(otherTasks);
+      const results = await runAllTasks(otherTasks);
+
+      console.log("results", results);
+
+      const successWithMessage = results.filter((r) => r[0] && r[1]);
+      if (successWithMessage.length > 0) {
+        console.log("successWithMessage", successWithMessage);
+        const resultMsg = successWithMessage.map((r) => r[1]).join("\n\n");
+        c.chat.postMessage(resultMsg);
+        sendAll(forcedMessage(cid, resultMsg));
+        return;
+      }
 
       // ####################
       // THE MAGNIFICENT LOOP
@@ -150,12 +163,6 @@ async function main() {
           log("root", "Error: Loop task failed", { task, cid });
           c.chat.postMessage("Task failed");
           sendAll(forcedMessage(cid, "Task failed"));
-          return;
-        }
-
-        if (success && resultMsg) {
-          c.chat.postMessage(resultMsg);
-          sendAll(forcedMessage(cid, resultMsg));
           return;
         }
       }

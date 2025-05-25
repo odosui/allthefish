@@ -26,9 +26,9 @@ export const READ_FILE: TaskDef = {
     return out;
   },
   run: async (ctx: TaskContext, task: WorkerTask) => {
-    const [p, content] = task.args;
-    if (!p || !content) {
-      return [false, "Misformed task"];
+    const p = task.args[0];
+    if (!p) {
+      return [false, "Misformed task: missing file path"];
     }
     const filePath = path.join(ctx.rootPath, ctx.dirName, p);
     log(READ_FILE_CMD, "Reading the file", { filePath });

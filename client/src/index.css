@@ -262,13 +262,13 @@ li p {
 }
 
 .message code {
-  background-color: var(--color-bg);
+  background-color: var(--color-chat-bg-2);
   padding: 2px var(--u0);
   border-radius: var(--u0);
 }
 
 .message pre {
-  background-color: var(--color-bg);
+  background-color: var(--color-chat-bg-2);
   padding: var(--u2);
   border-radius: var(--u1);
   overflow-x: auto;

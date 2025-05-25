@@ -22,10 +22,16 @@ export const TS_CHECK_TYPES: TaskDef = {
     if (code !== 0) {
       const msg = `Typescript checking failed with code ${code}. \n\n Stdout: \n\n \`\`\`\n${stdout}\n\`\`\`\n\n Stderr: \n\n \`\`\`\n${stderr}\n\`\`\``;
       log(TS_CHECK_TYPES_CMD, "Typescript checking failed", { msg });
-      return [false, msg];
+      return {
+        success: false,
+        messageToAgent: msg,
+      };
     } else {
       log(TS_CHECK_TYPES_CMD, "Typescript checking passed");
-      return [true, null];
+      return {
+        success: true,
+        messageToAgent: null,
+      };
     }
   },
   title: (_task: WorkerTask) => `Checking types...`,

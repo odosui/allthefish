@@ -60,11 +60,14 @@ export class ProjectWorker {
     return { ...COMMON_TASK_DEFS, ...defs };
   }
 
-  async runTask(task: WorkerTask): Promise<[boolean, string | null]> {
+  async runTask(task: WorkerTask) {
     const def = this.allTaskDefs()[task.type];
     if (!def) {
       log(ACTOR, "Error: Unknown task type", { task });
-      return [false, "Unknown task type"];
+      return {
+        success: false,
+        messageToAgent: `Unknown task type: ${task.type}`,
+      };
     }
     const ctx: TaskContext = { rootPath: this.rootPath, dirName: this.dirName };
     return await def.run(ctx, task);

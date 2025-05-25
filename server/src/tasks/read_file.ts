@@ -28,17 +28,23 @@ export const READ_FILE: TaskDef = {
   run: async (ctx: TaskContext, task: WorkerTask) => {
     const p = task.args[0];
     if (!p) {
-      return [false, "Misformed task: missing file path"];
+      return {
+        success: false,
+        messageToAgent: "Misformed task: missing the file path",
+      };
     }
     const filePath = path.join(ctx.rootPath, ctx.dirName, p);
     log(READ_FILE_CMD, "Reading the file", { filePath });
 
     const fileContent = await fs.readFile(filePath, "utf-8");
-    const msg = `
+    const messageToAgent = `
       [file ${p} content]\n
       ${fileContent}\n
     `;
-    return [true, msg];
+    return {
+      success: true,
+      messageToAgent,
+    };
   },
   title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
   isExposedToAi: true,

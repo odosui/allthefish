@@ -29,7 +29,10 @@ export const NPM_INSTALL_PACKAGE: TaskDef = {
     const dir = path.join(ctx.rootPath, ctx.dirName);
     const name = task.args[0];
     if (!name) {
-      return [false, "Misformed task"];
+      return {
+        success: false,
+        messageToAgent: "Misformed task: missing the package name",
+      };
     }
 
     log(NPM_INSTALL_CMD, "Installing package", { dir, package: name });
@@ -42,7 +45,10 @@ export const NPM_INSTALL_PACKAGE: TaskDef = {
       stdout,
       stderr,
     });
-    return [true, null];
+    return {
+      success: code === 0,
+      messageToAgent: null,
+    };
   },
   title: (task: WorkerTask) => `Installing package ${task.args[0]}`,
   isExposedToAi: true,

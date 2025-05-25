@@ -53,7 +53,10 @@ export const UPDATE_FILE: TaskDef = {
   run: async (ctx: TaskContext, task: WorkerTask) => {
     const [p, content] = task.args;
     if (!p || !content) {
-      return [false, "Misformed task"];
+      return {
+        success: false,
+        messageToAgent: "Misformed task: missing the file path or content",
+      };
     }
     const filePath = path.join(ctx.rootPath, ctx.dirName, p);
     log(UPDATE_FILE_CMD, "Updating file", { filePath });
@@ -61,7 +64,10 @@ export const UPDATE_FILE: TaskDef = {
     // Ensure the directory structure exists
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, content);
-    return [true, null];
+    return {
+      success: true,
+      messageToAgent: null,
+    };
   },
   title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
   isExposedToAi: true,

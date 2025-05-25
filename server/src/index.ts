@@ -19,6 +19,7 @@ import { log } from "./utils/logger";
 import { asString } from "./utils/ws";
 import { listFiles } from "./utils/files";
 import { NPM_INSTALL_CMD } from "./tasks/npm_install";
+import { TaskResult } from "./tasks/common_tasks";
 
 const PORT = process.env.PORT || 3000;
 
@@ -110,7 +111,7 @@ async function main() {
       }
 
       const runAllTasks = async (tasks: WorkerTask[]) => {
-        const results = [];
+        const results: TaskResult[] = [];
         for await (const task of tasks) {
           const tid = v4();
           sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
@@ -134,12 +135,17 @@ async function main() {
 
       console.log("results", results);
 
-      const successWithMessage = results.filter((r) => r[0] && r[1]);
+      const successWithMessage = results.filter(
+        (r) => r.success && !!r.messageToAgent,
+      );
+
       if (successWithMessage.length > 0) {
         console.log("successWithMessage", successWithMessage);
-        const resultMsg = successWithMessage.map((r) => r[1]).join("\n\n");
-        c.chat.postMessage(resultMsg);
-        sendAll(forcedMessage(cid, resultMsg));
+        const msgsToAgent = successWithMessage
+          .map((r) => r.messageToAgent)
+          .join("\n\n");
+        c.chat.postMessage(msgsToAgent);
+        sendAll(forcedMessage(cid, msgsToAgent));
         return;
       }
 
@@ -151,12 +157,12 @@ async function main() {
       for await (const task of lTasks) {
         const tid = v4();
         sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
-        const [success, resultMsg] = await c.worker.runTask(task);
+        const { success, messageToAgent } = await c.worker.runTask(task);
         sendAll(taskFinished(cid, tid));
-        if (!success && resultMsg) {
+        if (!success && messageToAgent) {
           log("root", "Error: Loop task failed", { task, cid });
-          c.chat.postMessage(resultMsg);
-          sendAll(forcedMessage(cid, resultMsg));
+          c.chat.postMessage(messageToAgent);
+          sendAll(forcedMessage(cid, messageToAgent));
           return;
         }
         if (!success) {
@@ -229,9 +235,11 @@ async function main() {
 
         // read the files in the project directory
         const files = await listFiles(config.projects_dir, project.dirname, [
-          ".git",
-          ".DS_Store",
-          "node_modules",
+          ".*node_modules.*",
+          ".*log.*",
+          ".*tmp.*",
+          "\.svg$",
+          "\.png$",
         ]);
 
         const systemWithFiles = `${system}\n\nFiles in the project:\n${files.join(", ")}`;

@@ -19,7 +19,7 @@ export const chatError = (id: string, error: string): WsOutputMessage => {
 export const taskStarted = (
   chatId: string,
   title: string,
-  taskId: string
+  taskId: string,
 ): WsOutputMessage => {
   return {
     chatId,
@@ -31,7 +31,7 @@ export const taskStarted = (
 
 export const taskFinished = (
   chatId: string,
-  taskId: string
+  taskId: string,
 ): WsOutputMessage => {
   return {
     chatId,

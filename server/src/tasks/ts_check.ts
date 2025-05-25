@@ -1,7 +1,8 @@
 import path from "path";
 import { WorkerTask } from "../project_worker";
 import { TaskContext, TaskDef } from "./common_tasks";
-import { log, runCmd } from "../helpers";
+import { log } from "../utils/logger";
+import { runCmd } from "../utils/proc";
 
 export const TS_CHECK_TYPES_CMD = "[ts-check-types]";
 

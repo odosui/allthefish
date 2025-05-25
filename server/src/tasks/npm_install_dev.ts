@@ -1,9 +1,11 @@
 import path from "path";
 import { WorkerTask } from "../project_worker";
 import { TaskContext, TaskDef } from "./common_tasks";
-import { log, runCmd } from "../helpers";
+import { log } from "../utils/logger";
+import { runCmd } from "../utils/proc";
 
-export const NPM_INSTALL_DEV_PACKAGE_CMD = "[npm-install-dev]";
+export const NPM_INSTALL_DEV_CMD = "[npm-install-dev]";
+export const NPM_INSTALL_DEV_INST = `At any time you can ask to install a development npm module: write ${NPM_INSTALL_DEV_CMD} <name>. Make sure you start with a new line.`;
 
 export const NPM_INSTALL_DEV_PACKAGE: TaskDef = {
   extract: (line: string) => {
@@ -13,14 +15,13 @@ export const NPM_INSTALL_DEV_PACKAGE: TaskDef = {
 
     // Parse INSTALL_PACKAGE tasks
     for (const line of lines) {
-      if (line.includes(NPM_INSTALL_DEV_PACKAGE_CMD)) {
+      if (line.includes(NPM_INSTALL_DEV_CMD)) {
         let name = line
           .substring(
-            line.indexOf(NPM_INSTALL_DEV_PACKAGE_CMD) +
-              NPM_INSTALL_DEV_PACKAGE_CMD.length,
+            line.indexOf(NPM_INSTALL_DEV_CMD) + NPM_INSTALL_DEV_CMD.length,
           )
           .trim();
-        out.push({ type: NPM_INSTALL_DEV_PACKAGE_CMD, args: [name] });
+        out.push({ type: NPM_INSTALL_DEV_CMD, args: [name] });
       }
     }
 
@@ -33,7 +34,7 @@ export const NPM_INSTALL_DEV_PACKAGE: TaskDef = {
       return [false, "Misformed task"];
     }
 
-    log(NPM_INSTALL_DEV_PACKAGE_CMD, "Installing dev package", {
+    log(NPM_INSTALL_DEV_CMD, "Installing dev package", {
       dir,
       package: name,
     });
@@ -42,7 +43,7 @@ export const NPM_INSTALL_DEV_PACKAGE: TaskDef = {
       name,
       "--save-dev",
     ]);
-    log(NPM_INSTALL_DEV_PACKAGE_CMD, "Dev package installation", {
+    log(NPM_INSTALL_DEV_CMD, "Dev package installation", {
       code,
       stdout,
       stderr,

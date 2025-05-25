@@ -1,31 +1,39 @@
 import fs from "fs/promises";
 import path from "path";
-import { runBackground, runCmd } from "../../helpers";
 import { Template } from "../template";
-import { NPM_INSTALL_PACKAGE } from "../../tasks/npm_install";
-import { NPM_INSTALL_DEV_PACKAGE } from "../../tasks/npm_install_dev";
-import { TS_CHECK_TYPES } from "../../tasks/ts_check";
+import {
+  NPM_INSTALL_CMD,
+  NPM_INSTALL_INST,
+  NPM_INSTALL_PACKAGE,
+} from "../../tasks/npm_install";
+import {
+  NPM_INSTALL_DEV_CMD,
+  NPM_INSTALL_DEV_INST,
+  NPM_INSTALL_DEV_PACKAGE,
+} from "../../tasks/npm_install_dev";
+import { TS_CHECK_TYPES, TS_CHECK_TYPES_CMD } from "../../tasks/ts_check";
 import { TaskDef } from "../../tasks/common_tasks";
 import { UPDATE_FILE_INST } from "../../tasks/update_file";
+import { READ_FILE_INST } from "../../tasks/read_file";
+import { runBackground, runCmd } from "../../utils/proc";
 
 const SYSTEM_MSG = [
   // intro
-  "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
+  "You are a professional TypeScript and React programmer. You task is to update an existing website based on the provided description.",
   // short files
   "Whatever files you create/update, make sure they are as small as possible. It's better to have multiple small files than a single large file.",
   UPDATE_FILE_INST,
-  // INSTALL_PACKAGE to install npm packages
-  "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name> (or INSTALL_DEV_PACKAGE to use --save-dev). Make sure you start with a new line.",
+  READ_FILE_INST,
+  NPM_INSTALL_INST,
+  NPM_INSTALL_DEV_INST,
   // PROVIDE_SCREENSHOT to ask for a screenshot
-  "At any time you can ask for a screenshot: write PROVIDE_SCREENSHOT.",
+  "At any time you can ask for a screenshot: write [provide-screenshot].",
   // Be concise
   "Please be consise, and don't explain anything until asked by a user.",
   // Good practices
   "Consider the following good practices: files should be small, components should be reusable, the code should be clean and easy to understand. In CSS, use CSS variables. Use css variables (--u1, --u2, and so on) for length units.",
   // Code blocks
   "Don't forget to use ``` for code blocks.",
-  // Start point
-  "You start at `src/App.tsx`.",
 ].join("\n");
 
 async function scaffold(rootPath: string, dirName: string) {
@@ -47,9 +55,9 @@ async function scaffold(rootPath: string, dirName: string) {
 }
 
 const TASK_DEFS: Record<string, TaskDef> = {
-  INSTALL_PACKAGE: NPM_INSTALL_PACKAGE,
-  INSTALL_DEV_PACKAGE: NPM_INSTALL_DEV_PACKAGE,
-  CHECK_TYPES: TS_CHECK_TYPES,
+  [NPM_INSTALL_CMD]: NPM_INSTALL_PACKAGE,
+  [NPM_INSTALL_DEV_CMD]: NPM_INSTALL_DEV_PACKAGE,
+  [TS_CHECK_TYPES_CMD]: TS_CHECK_TYPES,
 };
 
 function startApplication(rootPath: string, dirName: string, port: number) {

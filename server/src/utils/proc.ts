@@ -1,16 +1,7 @@
 import { spawn } from "child_process";
-import { RawData } from "ws";
+import { log } from "./logger";
 
-const ACTOR = "helper";
-
-export function log(actor: string, message: string, data?: any) {
-  const d = new Date().toISOString();
-  if (arguments.length === 2) {
-    console.log(`[${d}] (${actor}) ${message}`);
-  } else {
-    console.log(`[${d}] (${actor}) ${message}`, data);
-  }
-}
+const ACTOR = "utils/proc";
 
 export function runBackground(atPath: string, cmd: string, args: string[]) {
   log(ACTOR, `Running command: ${cmd} ${args.join(" ")}`);
@@ -38,7 +29,7 @@ export function runBackground(atPath: string, cmd: string, args: string[]) {
 export async function runCmd(
   atPath: string,
   cmd: string,
-  args: string[]
+  args: string[],
 ): Promise<{
   code: number | null;
   stdout: string;
@@ -61,15 +52,4 @@ export async function runCmd(
       resolve({ code, stdout, stderr });
     });
   });
-}
-
-export function asString(message: RawData) {
-  if (message instanceof Buffer) {
-    return message.toString();
-  } else if (typeof message === "string") {
-    return message;
-  } else {
-    log(ACTOR, "Error: Received message is not a string");
-    return null;
-  }
 }

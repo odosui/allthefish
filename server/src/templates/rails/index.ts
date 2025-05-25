@@ -1,9 +1,9 @@
 import path from "path";
-import { runBackground } from "../../helpers";
 import { Template } from "../template";
 import { TaskDef } from "../../tasks/common_tasks";
 import { UPDATE_FILE_INST } from "../../tasks/update_file";
 import { READ_FILE_INST } from "../../tasks/read_file";
+import { runBackground } from "../../utils/proc";
 
 const SYSTEM = [
   "You are a professional Ruby On Rails developer. Your task is to work on a Rails project based on provided description.",

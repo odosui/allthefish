@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs/promises";
 import { WorkerTask } from "../project_worker";
 import { TaskContext, TaskDef } from "./common_tasks";
-import { log } from "../helpers";
+import { log } from "../utils/logger";
 
 export const READ_FILE_CMD = "[read-file]";
 
@@ -42,5 +42,5 @@ export const READ_FILE: TaskDef = {
   },
   title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
   isExposedToAi: true,
-  isLoop: true,
+  isLoop: false,
 };

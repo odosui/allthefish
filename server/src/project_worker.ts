@@ -1,14 +1,14 @@
 import { ChildProcess } from "child_process";
 import path from "path";
-import { log } from "./helpers";
 import { TaskContext, TaskDef } from "./tasks/common_tasks";
-import { READ_FILE } from "./tasks/read_file";
-import { UPDATE_FILE } from "./tasks/update_file";
+import { READ_FILE, READ_FILE_CMD } from "./tasks/read_file";
+import { UPDATE_FILE, UPDATE_FILE_CMD } from "./tasks/update_file";
 import rails from "./templates/rails";
 import { Template } from "./templates/template";
 import viteReactTs from "./templates/vite_react_ts";
 import { isDirExists } from "./utils/files";
 import { initGit } from "./utils/git";
+import { log } from "./utils/logger";
 
 export type TemplateName = "vite:react-ts" | "rails";
 
@@ -21,8 +21,8 @@ const TEMPLATES: Record<TemplateName, Template> = {
 const ACTOR = "projworker";
 
 const COMMON_TASK_DEFS: Record<string, TaskDef> = {
-  UPDATE_FILE,
-  READ_FILE,
+  [UPDATE_FILE_CMD]: UPDATE_FILE,
+  [READ_FILE_CMD]: READ_FILE,
 };
 
 export type WorkerTask = {
@@ -117,9 +117,7 @@ export class ProjectWorker {
 
     return Object.keys(defs)
       .filter((k) => defs[k]?.isLoop)
-      .map((k) => {
-        return { type: k, args: [] };
-      });
+      .map((k) => ({ type: k, args: [] }));
   }
 
   getSystemMessage() {

@@ -1,4 +1,4 @@
-import { runCmd } from "../helpers";
+import { runCmd } from "./proc";
 
 export async function initGit(dir: string) {
   await runCmd(dir, "git", [

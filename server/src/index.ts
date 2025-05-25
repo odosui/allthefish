@@ -3,7 +3,6 @@ import { v4 } from "uuid";
 import ws from "ws";
 import { WsInputMessage, WsOutputMessage } from "../../shared/types";
 import ConfigFile, { IConfigFile } from "./config_file";
-import { asString, log } from "./helpers";
 import { ProjectWorker, TemplateName, WorkerTask } from "./project_worker";
 import { addRestRoutes as registerRoutes } from "./rest";
 import {
@@ -16,6 +15,10 @@ import {
 } from "./utils/messages";
 import { AnthropicChat } from "../../../multichatai/server/src/vendors/anthropic";
 import { OpenAiChat } from "../../../multichatai/server/src/vendors/openai";
+import { log } from "./utils/logger";
+import { asString } from "./utils/ws";
+import { listFiles } from "./utils/files";
+import { NPM_INSTALL_CMD } from "./tasks/npm_install";
 
 const PORT = process.env.PORT || 3000;
 
@@ -28,6 +31,13 @@ type Project = {
 };
 
 export const PROJECTS: Record<string, Project> = {
+  babuli: {
+    id: "babuli",
+    name: "babuli",
+    dirname: "babuli",
+    template: "vite:react-ts",
+    port: 3010,
+  },
   candl: {
     id: "candl",
     name: "candl",
@@ -90,6 +100,8 @@ async function main() {
     }
 
     const handleReplyFinish = async (cid: string, content: string) => {
+      console.log("reply", content);
+
       // RUNNING TASKS
       const c = CHAT_STORE[cid];
       if (!c) {
@@ -98,6 +110,7 @@ async function main() {
       }
 
       const runAllTasks = async (tasks: WorkerTask[]) => {
+        console.log("running tasks", tasks);
         for await (const task of tasks) {
           const tid = v4();
           sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
@@ -108,11 +121,13 @@ async function main() {
 
       const tasks = c.worker.parseTasks(content);
 
+      console.log("tasks to run", tasks);
+
       // TODO: we need to implement priority
-      const installTasks = tasks.filter((t) => t.type === "INSTALL_PACKAGE");
+      const installTasks = tasks.filter((t) => t.type === NPM_INSTALL_CMD);
       await runAllTasks(installTasks);
 
-      const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
+      const otherTasks = tasks.filter((t) => t.type !== NPM_INSTALL_CMD);
       await runAllTasks(otherTasks);
 
       // ####################
@@ -204,8 +219,18 @@ async function main() {
           p.vendor === "openai" ? config.openai_key : config.anthropic_key;
 
         const system = worker.getSystemMessage();
-        log("root", "Starting chat", { system });
 
+        // read the files in the project directory
+        const files = await listFiles(config.projects_dir, project.dirname, [
+          ".git",
+          ".DS_Store",
+          "node_modules",
+        ]);
+
+        const systemWithFiles = `${system}\n\nFiles in the project:\n${files.join(", ")}`;
+        log("root", "Starting chat", { system: systemWithFiles });
+
+        // initialize the chat engine
         const chat = new ChatEngine(apiKey, p.model, system);
         CHAT_STORE[id] = {
           profile: data.profile,

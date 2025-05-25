@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs/promises";
 import { WorkerTask } from "../project_worker";
 import { TaskContext, TaskDef } from "./common_tasks";
-import { log } from "../helpers";
+import { log } from "../utils/logger";
 
 export const UPDATE_FILE_CMD = "[update-file]";
 

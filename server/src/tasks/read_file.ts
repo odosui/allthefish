@@ -48,7 +48,7 @@ export const READ_FILE: TaskDef = {
       messageToAgent,
     };
   },
-  title: (task: WorkerTask) => `Updating file ${task.args[0]}`,
+  title: (task: WorkerTask) => `Sending file ${task.args[0]}`,
   isExposedToAi: true,
   isLoop: false,
 };

@@ -4,7 +4,7 @@ import ws from "ws";
 import { AnthropicChat } from "../../../multichatai/server/src/vendors/anthropic";
 import { OpenAiChat } from "../../../multichatai/server/src/vendors/openai";
 import { WsInputMessage, WsOutputMessage } from "../../shared/types";
-import ConfigFile, { IConfigFile, readLocalConfig } from "./config_file";
+import { readLocalConfig } from "./config_file";
 import { ProjectWorker, TemplateName, WorkerTask } from "./project_worker";
 import { addRestRoutes as registerRoutes } from "./rest";
 import { TaskResult } from "./tasks/common_tasks";
@@ -20,6 +20,7 @@ import {
   taskStarted,
 } from "./utils/messages";
 import { asString } from "./utils/ws";
+import { MODELS } from "./models";
 
 const PORT = process.env.PORT || 3000;
 
@@ -57,10 +58,8 @@ async function main() {
     process.exit(1);
   }
 
-  const config: IConfigFile | null = await ConfigFile.readConfig();
-
   const app = express();
-  registerRoutes(app, config, {
+  registerRoutes(app, {
     port: localConf.port,
   });
 
@@ -180,7 +179,7 @@ async function main() {
       const data = JSON.parse(messageStr) as WsInputMessage;
 
       if (data.type === "START_CHAT") {
-        const p = config?.profiles[data.profile];
+        const p = MODELS[data.profile];
 
         if (!p) {
           log("root", "Error: Profile not found", { profile: data.profile });
@@ -216,9 +215,16 @@ async function main() {
           return;
         }
 
+        const openaiKey = process.env.OPENAI_API_KEY;
+        const anrhropicKey = process.env.ANTHROPIC_API_KEY;
+
         const ChatEngine = p.vendor === "openai" ? OpenAiChat : AnthropicChat;
-        const apiKey =
-          p.vendor === "openai" ? config.openai_key : config.anthropic_key;
+        const apiKey = p.vendor === "openai" ? openaiKey : anrhropicKey;
+
+        if (!apiKey) {
+          log("root", "Error: API key is not found", { vendor: p.vendor });
+          return;
+        }
 
         const system = worker.getSystemMessage();
 

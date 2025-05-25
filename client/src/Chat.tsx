@@ -144,7 +144,7 @@ const Chat: React.FC<{
 
       <div className="messages" ref={messagesRef}>
         {messages?.length === 0 && (
-          <div className="placeholder">You agent ({name}) is ready 🤖</div>
+          <div className="placeholder">Your agent is ready 🤖</div>
         )}
 
         {messages.map((m, i) => (

@@ -40,6 +40,7 @@
   --color-chat-bg: #181825;
   --color-chat-bg-1: #24243a;
   --color-chat-bg-2: #3a3b4c;
+  --color-chat-bg-3: #44475a;
   --color-chat-text: #f8f8f2;
   --color-chat-text-secondary: #bfbfbf;
   --color-chat-border: #44475a;
@@ -56,9 +57,9 @@ a:hover {
 }
 
 body {
-  background-color: var(--color-bg);
+  background-color: var(--color-chat-bg);
   margin: 0;
-  color: var(--color-text);
+  /* color: var(--color-text); */
   font-size: 16px;
 }
 
@@ -101,7 +102,6 @@ main.app {
   flex-basis: var(--u13);
   flex: 0 0 auto;
   background-color: var(--color-chat-bg);
-  border-left: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -310,7 +310,7 @@ li p {
 }
 
 .chat-starter {
-  background: white;
+  background: var(--color-chat-bg-1);
   padding: var(--u3);
   margin: var(--u4);
   border-radius: 16px;
@@ -337,16 +337,17 @@ li p {
   width: 100%;
   padding: var(--u2);
   border-radius: 8px;
-  background-color: var(--color-bg);
+  background-color: var(--color-chat-bg-2);
   font-weight: 500;
   text-align: left;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  color: var(--color-chat-text);
 }
 
 .chat-starter ul li button:hover {
-  background-color: var(--color-bg-alt);
+  background-color: var(--color-chat-bg-3);
 }
 
 .chat-starter input {
@@ -361,6 +362,10 @@ li p {
 .preview {
   flex: 1;
   margin: 0;
+  margin: var(--u2);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--u1);
+  overflow: hidden;
 }
 
 .preview iframe {

@@ -1,11 +1,10 @@
 import { Express } from "express";
-import { ChatSession } from "../../shared/types";
-import { IConfigFile } from "./config_file";
 import { CHAT_STORE } from ".";
+import { ChatSession } from "../../shared/types";
+import { MODELS } from "./models";
 
 export function addRestRoutes(
   app: Express,
-  config: IConfigFile | null,
   project: {
     port: number;
   },
@@ -27,13 +26,8 @@ export function addRestRoutes(
   });
 
   app.get("/api/profiles", async (_req, res) => {
-    if (!config) {
-      res.status(500).json({ error: "Config file not present" });
-      return;
-    }
-
     try {
-      const profiles = Object.entries(config.profiles).map(([name, p]) => {
+      const profiles = Object.entries(MODELS).map(([name, p]) => {
         return {
           name,
           vendor: p.vendor,

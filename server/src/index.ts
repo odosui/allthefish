@@ -31,7 +31,7 @@ export const PROJECTS: Record<string, Project> = {
   candl: {
     id: "candl",
     name: "candl",
-    dirname: "candl/app",
+    dirname: "candl/candl-app",
     template: "rails",
     port: 3003,
   },
@@ -115,20 +115,32 @@ async function main() {
       const otherTasks = tasks.filter((t) => t.type !== "INSTALL_PACKAGE");
       await runAllTasks(otherTasks);
 
-      // #############
+      // ####################
       // THE MAGNIFICENT LOOP
-      // #############
+      // ####################
 
       const lTasks = c.worker.loopTasks();
       for await (const task of lTasks) {
         const tid = v4();
         sendAll(taskStarted(cid, c.worker.taskTitle(task), tid));
-        const [success, error] = await c.worker.runTask(task);
+        const [success, resultMsg] = await c.worker.runTask(task);
         sendAll(taskFinished(cid, tid));
+        if (!success && resultMsg) {
+          log("root", "Error: Loop task failed", { task, cid });
+          c.chat.postMessage(resultMsg);
+          sendAll(forcedMessage(cid, resultMsg));
+          return;
+        }
         if (!success) {
           log("root", "Error: Loop task failed", { task, cid });
-          c.chat.postMessage(error);
-          sendAll(forcedMessage(cid, error));
+          c.chat.postMessage("Task failed");
+          sendAll(forcedMessage(cid, "Task failed"));
+          return;
+        }
+
+        if (success && resultMsg) {
+          c.chat.postMessage(resultMsg);
+          sendAll(forcedMessage(cid, resultMsg));
           return;
         }
       }
@@ -171,14 +183,14 @@ async function main() {
           project.template,
         );
 
-        const createRes = await worker.createProject();
+        // const createRes = await worker.createProject();
 
-        if (createRes === "EXISTS") {
-          log("root", "Error: Project already exists", {
-            dir: config.projects_dir,
-          });
-          return;
-        }
+        // if (createRes === "EXISTS") {
+        //   log("root", "Error: Project already exists", {
+        //     dir: config.projects_dir,
+        //   });
+        //   return;
+        // }
 
         worker.startApplication();
 

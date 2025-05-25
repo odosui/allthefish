@@ -2,6 +2,7 @@ import { ChildProcess } from "child_process";
 import path from "path";
 import { log } from "./helpers";
 import { TaskContext, TaskDef } from "./tasks/common_tasks";
+import { READ_FILE } from "./tasks/read_file";
 import { UPDATE_FILE } from "./tasks/update_file";
 import rails from "./templates/rails";
 import { Template } from "./templates/template";
@@ -21,6 +22,7 @@ const ACTOR = "projworker";
 
 const COMMON_TASK_DEFS: Record<string, TaskDef> = {
   UPDATE_FILE,
+  READ_FILE,
 };
 
 export type WorkerTask = {
@@ -58,7 +60,7 @@ export class ProjectWorker {
     return { ...COMMON_TASK_DEFS, ...defs };
   }
 
-  async runTask(task: WorkerTask): Promise<[true, null] | [false, string]> {
+  async runTask(task: WorkerTask): Promise<[boolean, string | null]> {
     const def = this.allTaskDefs()[task.type];
     if (!def) {
       log(ACTOR, "Error: Unknown task type", { task });
@@ -69,7 +71,15 @@ export class ProjectWorker {
   }
 
   startApplication() {
-    log(ACTOR, "Starting the project in the background...");
+    log(
+      ACTOR,
+      [
+        "Starting the project in the background...",
+        this.rootPath,
+        this.dirName,
+        this.port,
+      ].join(", "),
+    );
     this.serverProcess = TEMPLATES[this.template].startApplication(
       this.rootPath,
       this.dirName,

@@ -3,10 +3,12 @@ import { runBackground } from "../../helpers";
 import { Template } from "../template";
 import { TaskDef } from "../../tasks/common_tasks";
 import { UPDATE_FILE_INST } from "../../tasks/update_file";
+import { READ_FILE_INST } from "../../tasks/read_file";
 
 const SYSTEM = [
   "You are a professional Ruby On Rails developer. Your task is to work on a Rails project based on provided description.",
   "Please be consise, and don't explain anything until directly asked by user.",
+  READ_FILE_INST,
   UPDATE_FILE_INST,
 ].join("\n");
 

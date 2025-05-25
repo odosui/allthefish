@@ -13,7 +13,7 @@ export type TaskDef = {
   run: (
     ctx: TaskContext,
     task: WorkerTask,
-  ) => Promise<[true, null] | [false, string]>;
+  ) => Promise<[boolean, string | null]>;
   title: (task: WorkerTask) => string;
   isExposedToAi: boolean;
   isLoop: boolean;

@@ -58,7 +58,7 @@ export const UPDATE_FILE: TaskDef = {
         messageToAgent: "Misformed task: missing the file path or content",
       };
     }
-    const filePath = path.join(ctx.rootPath, ctx.dirName, p);
+    const filePath = path.join(ctx.rootPath, p);
     log(UPDATE_FILE_CMD, "Updating file", { filePath });
 
     // Ensure the directory structure exists

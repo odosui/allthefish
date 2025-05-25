@@ -3,11 +3,7 @@ import { TaskDef } from "../tasks/common_tasks";
 
 export type Template = {
   system: string;
-  scaffold: (rootPath: string, dirName: string) => Promise<void>;
+  scaffold: (rootPath: string) => Promise<void>;
   taskDefs: Record<string, TaskDef>;
-  startApplication: (
-    rootPath: string,
-    dirName: string,
-    port: number,
-  ) => ChildProcess;
+  startApplication: (rootPath: string, port: number) => ChildProcess;
 };

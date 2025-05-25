@@ -5,7 +5,6 @@ import { WorkerTask } from "../project_worker";
 
 export type TaskContext = {
   rootPath: string;
-  dirName: string;
 };
 
 export type TaskResult = {

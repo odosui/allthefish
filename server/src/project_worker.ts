@@ -1,5 +1,4 @@
 import { ChildProcess } from "child_process";
-import path from "path";
 import { TaskContext, TaskDef } from "./tasks/common_tasks";
 import { READ_FILE, READ_FILE_CMD } from "./tasks/read_file";
 import { UPDATE_FILE, UPDATE_FILE_CMD } from "./tasks/update_file";
@@ -32,25 +31,17 @@ export type WorkerTask = {
 
 export class ProjectWorker {
   private rootPath = "";
-  private dirName = "";
   private port = 0;
   private template: TemplateName;
   protected serverProcess: ChildProcess | null = null;
 
-  constructor(
-    rootPath: string,
-    dirName: string,
-    port: number,
-    template: TemplateName,
-  ) {
+  constructor(rootPath: string, port: number, template: TemplateName) {
     log(ACTOR, "Creating project worker", {
       rootPath,
-      dirName,
       port,
       template,
     });
     this.rootPath = rootPath;
-    this.dirName = dirName;
     this.port = port;
     this.template = template;
   }
@@ -69,7 +60,7 @@ export class ProjectWorker {
         messageToAgent: `Unknown task type: ${task.type}`,
       };
     }
-    const ctx: TaskContext = { rootPath: this.rootPath, dirName: this.dirName };
+    const ctx: TaskContext = { rootPath: this.rootPath };
     return await def.run(ctx, task);
   }
 
@@ -79,21 +70,18 @@ export class ProjectWorker {
       [
         "Starting the project in the background...",
         this.rootPath,
-        this.dirName,
         this.port,
       ].join(", "),
     );
     this.serverProcess = TEMPLATES[this.template].startApplication(
       this.rootPath,
-      this.dirName,
       this.port,
     );
   }
 
   async createProject(): Promise<"OK" | "EXISTS" | "UNKNOWN_TEMPLATE"> {
     const rootPath = this.rootPath;
-    const dirName = this.dirName;
-    const dir = path.join(rootPath, dirName);
+    const dir = rootPath;
 
     log(ACTOR, "Creating project new project at", { dir });
 
@@ -106,7 +94,7 @@ export class ProjectWorker {
 
     const scaffold = TEMPLATES[this.template].scaffold;
     log(ACTOR, "Creating project using template", { template: this.template });
-    await scaffold(rootPath, dirName);
+    await scaffold(rootPath);
     await initGit(dir);
     return "OK";
   }

@@ -1,8 +1,7 @@
-import path from "path";
 import { WorkerTask } from "../project_worker";
-import { TaskContext, TaskDef } from "./common_tasks";
 import { log } from "../utils/logger";
 import { runCmd } from "../utils/proc";
+import { TaskContext, TaskDef } from "./common_tasks";
 
 export const NPM_INSTALL_CMD = "[npm-install]";
 export const NPM_INSTALL_INST = `At any time you can ask to install an npm module: write ${NPM_INSTALL_CMD} <name>. Make sure you start with a new line.`;
@@ -26,7 +25,7 @@ export const NPM_INSTALL_PACKAGE: TaskDef = {
     return out;
   },
   run: async (ctx: TaskContext, task: WorkerTask) => {
-    const dir = path.join(ctx.rootPath, ctx.dirName);
+    const dir = ctx.rootPath;
     const name = task.args[0];
     if (!name) {
       return {

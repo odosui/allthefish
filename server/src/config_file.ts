@@ -1,9 +1,9 @@
-import fs from "fs/promises";
+import { TemplateName } from "./project_worker";
+import { readFileToJson } from "./utils/files";
 
 export type IConfigFile = {
   openai_key: string;
   anthropic_key: string;
-  projects_dir: string;
   profiles: Record<
     string,
     {
@@ -15,25 +15,17 @@ export type IConfigFile = {
 
 const ConfigFile = {
   readConfig: async () => {
-    try {
-      const configFile = await fs.readFile("config.json", "utf-8");
-      return JSON.parse(configFile) as IConfigFile;
-    } catch (error) {
-      console.error("Failed to read configuration file:", error);
-      return null;
-    }
-  },
-
-  readProfiles: async () => {
-    try {
-      const configFile = await fs.readFile("config.json", "utf-8");
-      const config: IConfigFile = JSON.parse(configFile);
-      return Object.keys(config.profiles);
-    } catch (error) {
-      console.error("Failed to read configuration file:", error);
-      return null;
-    }
+    return await readFileToJson<IConfigFile>("config.json");
   },
 };
 
 export default ConfigFile;
+
+export const readLocalConfig = async (path: string) => {
+  const configFile = path + "/.allthefish.json";
+  const json = await readFileToJson<{
+    port: number;
+    template: TemplateName;
+  }>(configFile);
+  return json ? json : null;
+};

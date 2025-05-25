@@ -1,10 +1,16 @@
 import express from "express";
 import { v4 } from "uuid";
 import ws from "ws";
+import { AnthropicChat } from "../../../multichatai/server/src/vendors/anthropic";
+import { OpenAiChat } from "../../../multichatai/server/src/vendors/openai";
 import { WsInputMessage, WsOutputMessage } from "../../shared/types";
-import ConfigFile, { IConfigFile } from "./config_file";
+import ConfigFile, { IConfigFile, readLocalConfig } from "./config_file";
 import { ProjectWorker, TemplateName, WorkerTask } from "./project_worker";
 import { addRestRoutes as registerRoutes } from "./rest";
+import { TaskResult } from "./tasks/common_tasks";
+import { NPM_INSTALL_CMD } from "./tasks/npm_install";
+import { listFiles } from "./utils/files";
+import { log } from "./utils/logger";
 import {
   autoPilotOff,
   chatError,
@@ -13,47 +19,9 @@ import {
   taskFinished,
   taskStarted,
 } from "./utils/messages";
-import { AnthropicChat } from "../../../multichatai/server/src/vendors/anthropic";
-import { OpenAiChat } from "../../../multichatai/server/src/vendors/openai";
-import { log } from "./utils/logger";
 import { asString } from "./utils/ws";
-import { listFiles } from "./utils/files";
-import { NPM_INSTALL_CMD } from "./tasks/npm_install";
-import { TaskResult } from "./tasks/common_tasks";
 
 const PORT = process.env.PORT || 3000;
-
-type Project = {
-  id: string;
-  name: string;
-  dirname: string;
-  port: number;
-  template: TemplateName;
-};
-
-export const PROJECTS: Record<string, Project> = {
-  babuli: {
-    id: "babuli",
-    name: "babuli",
-    dirname: "babuli",
-    template: "vite:react-ts",
-    port: 3010,
-  },
-  candl: {
-    id: "candl",
-    name: "candl",
-    dirname: "candl/candl-app",
-    template: "rails",
-    port: 3003,
-  },
-  mytest: {
-    id: "mytest",
-    name: "mytest",
-    dirname: "mytest",
-    template: "vite:react-ts",
-    port: 3001,
-  },
-};
 
 export const CHAT_STORE: Record<
   string,
@@ -66,10 +34,35 @@ export const CHAT_STORE: Record<
 > = {};
 
 async function main() {
+  // read cms arguments
+  const args = process.argv.slice(2);
+  console.log("Running with args", args);
+
+  const atPath = args.find((arg) => arg.startsWith("--at="));
+
+  if (!atPath) {
+    console.error("Error: --at=path argument is required");
+    process.exit(1);
+  }
+
+  const path = atPath.split("=")[1];
+  if (!path) {
+    console.error("Error: --at=path argument is malformed");
+    process.exit(1);
+  }
+
+  const localConf = await readLocalConfig(path);
+  if (!localConf) {
+    console.error(`Error: Could not read local config at ${path}`);
+    process.exit(1);
+  }
+
   const config: IConfigFile | null = await ConfigFile.readConfig();
 
   const app = express();
-  registerRoutes(app, config);
+  registerRoutes(app, config, {
+    port: localConf.port,
+  });
 
   const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
@@ -194,21 +187,17 @@ async function main() {
           return;
         }
 
-        const project = PROJECTS[data.projectId];
+        const id = v4();
 
-        if (!project) {
-          log("root", "Error: Project not found", {
-            projectId: data.projectId,
-          });
+        if (!path) {
+          log("root", "Error: Path is not defined");
           return;
         }
 
-        const id = v4();
         const worker = new ProjectWorker(
-          config.projects_dir,
-          project.dirname,
-          project.port,
-          project.template,
+          path,
+          localConf?.port ?? 0,
+          localConf?.template as TemplateName,
         );
 
         // const createRes = await worker.createProject();
@@ -234,7 +223,7 @@ async function main() {
         const system = worker.getSystemMessage();
 
         // read the files in the project directory
-        const files = await listFiles(config.projects_dir, project.dirname, [
+        const files = await listFiles(path, [
           ".*node_modules.*",
           ".*log.*",
           ".*tmp.*",

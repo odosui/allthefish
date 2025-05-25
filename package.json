@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "cd server && npm run dev",
+    "dev:server": "cd server && npm run dev  -- --at=/Users/yanis/projects/candl/candl-app",
     "dev:client": "cd client && npm run dev"
   },
   "keywords": [],

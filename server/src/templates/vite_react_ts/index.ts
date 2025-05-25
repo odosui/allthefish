@@ -1,6 +1,5 @@
 import fs from "fs/promises";
-import path from "path";
-import { Template } from "../template";
+import { TaskDef } from "../../tasks/common_tasks";
 import {
   NPM_INSTALL_CMD,
   NPM_INSTALL_INST,
@@ -11,11 +10,11 @@ import {
   NPM_INSTALL_DEV_INST,
   NPM_INSTALL_DEV_PACKAGE,
 } from "../../tasks/npm_install_dev";
-import { TS_CHECK_TYPES, TS_CHECK_TYPES_CMD } from "../../tasks/ts_check";
-import { TaskDef } from "../../tasks/common_tasks";
-import { UPDATE_FILE_INST } from "../../tasks/update_file";
 import { READ_FILE_INST } from "../../tasks/read_file";
+import { TS_CHECK_TYPES, TS_CHECK_TYPES_CMD } from "../../tasks/ts_check";
+import { UPDATE_FILE_INST } from "../../tasks/update_file";
 import { runBackground, runCmd } from "../../utils/proc";
+import { Template } from "../template";
 
 const SYSTEM_MSG = [
   // intro
@@ -36,22 +35,20 @@ const SYSTEM_MSG = [
   "Don't forget to use ``` for code blocks.",
 ].join("\n");
 
-async function scaffold(rootPath: string, dirName: string) {
-  const dir = path.join(rootPath, dirName);
-
+async function scaffold(rootPath: string) {
   await runCmd(rootPath, "npm", [
     "create",
     "vite@latest",
-    dirName,
+    rootPath,
     "--",
     "--template",
     "react-ts",
   ]);
 
-  await runCmd(dir, "npm", ["install"]);
+  await runCmd(rootPath, "npm", ["install"]);
 
   // I don't like the default styles
-  await fs.writeFile(`${dir}/src/index.css`, "");
+  await fs.writeFile(`${rootPath}/src/index.css`, "");
 }
 
 const TASK_DEFS: Record<string, TaskDef> = {
@@ -60,9 +57,8 @@ const TASK_DEFS: Record<string, TaskDef> = {
   [TS_CHECK_TYPES_CMD]: TS_CHECK_TYPES,
 };
 
-function startApplication(rootPath: string, dirName: string, port: number) {
-  const dir = path.join(rootPath, dirName);
-  return runBackground(dir, "npm", [
+function startApplication(rootPath: string, port: number) {
+  return runBackground(rootPath, "npm", [
     "run",
     "dev",
     "--",

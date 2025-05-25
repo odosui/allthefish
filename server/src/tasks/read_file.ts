@@ -33,13 +33,15 @@ export const READ_FILE: TaskDef = {
         messageToAgent: "Misformed task: missing the file path",
       };
     }
-    const filePath = path.join(ctx.rootPath, ctx.dirName, p);
+    const filePath = path.join(ctx.rootPath, p);
     log(READ_FILE_CMD, "Reading the file", { filePath });
 
     const fileContent = await fs.readFile(filePath, "utf-8");
     const messageToAgent = `
       [file ${p} content]\n
+      \`\`\`\n
       ${fileContent}\n
+      \`\`\`
     `;
     return {
       success: true,

@@ -1,8 +1,7 @@
-import path from "path";
 import { WorkerTask } from "../project_worker";
-import { TaskContext, TaskDef } from "./common_tasks";
 import { log } from "../utils/logger";
 import { runCmd } from "../utils/proc";
+import { TaskContext, TaskDef } from "./common_tasks";
 
 export const TS_CHECK_TYPES_CMD = "[ts-check-types]";
 
@@ -12,7 +11,7 @@ export const TS_CHECK_TYPES: TaskDef = {
     return [];
   },
   run: async (ctx: TaskContext, _task: WorkerTask) => {
-    const dir = path.join(ctx.rootPath, ctx.dirName);
+    const dir = ctx.rootPath;
     log(TS_CHECK_TYPES_CMD, "Checking types for project", { dir });
     const { code, stdout, stderr } = await runCmd(
       dir,

@@ -1,9 +1,15 @@
 import { Express } from "express";
 import { ChatSession } from "../../shared/types";
 import { IConfigFile } from "./config_file";
-import { CHAT_STORE, PROJECTS } from ".";
+import { CHAT_STORE } from ".";
 
-export function addRestRoutes(app: Express, config: IConfigFile | null) {
+export function addRestRoutes(
+  app: Express,
+  config: IConfigFile | null,
+  project: {
+    port: number;
+  },
+) {
   // allow CORS
   app.use((_req, res, next) => {
     res.header("Access-Control-Allow-Origin", "http://localhost:5173");
@@ -16,24 +22,7 @@ export function addRestRoutes(app: Express, config: IConfigFile | null) {
     res.json({ status: "OK" });
   });
 
-  app.get("/api/projects", async (_req, res) => {
-    if (!config) {
-      res.status(500).json({ error: "Config file not present" });
-      return;
-    }
-
-    res.json(Object.values(PROJECTS));
-  });
-
-  app.get("/api/projects/:id", async (req, res) => {
-    const id = req.params.id;
-    const project = PROJECTS[id];
-
-    if (!project) {
-      res.status(404).json({ error: "Project not found" });
-      return;
-    }
-
+  app.get("/api/project", async (_req, res) => {
     res.json(project);
   });
 

@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { WsOutputMessage } from "../../../../shared/types";
 import api from "../../api";
-import { Profile, Project } from "../Home";
 import ChatStarter from "../../ChatStarter";
 import { useWs } from "../../useWs";
-import { WsOutputMessage } from "../../../../shared/types";
+import { Profile, Project } from "../Home";
 
 function ProjectPage() {
-  const { id } = useParams();
-
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [project, setProject] = useState<Project | null>(null);
 
@@ -35,13 +33,13 @@ function ProjectPage() {
     }
 
     async function fetchProject() {
-      const { json } = await api.get<Project>(`/projects/${id}`);
+      const { json } = await api.get<Project>("/project");
       setProject(json);
     }
 
     fetchProfiles();
     fetchProject();
-  }, [id]);
+  }, []);
 
   return (
     <main className="app">

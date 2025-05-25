@@ -1,9 +1,8 @@
-import path from "path";
-import { Template } from "../template";
 import { TaskDef } from "../../tasks/common_tasks";
-import { UPDATE_FILE_INST } from "../../tasks/update_file";
 import { READ_FILE_INST } from "../../tasks/read_file";
+import { UPDATE_FILE_INST } from "../../tasks/update_file";
 import { runBackground } from "../../utils/proc";
+import { Template } from "../template";
 
 const SYSTEM = [
   "You are a professional Ruby On Rails developer. Your task is to work on a Rails project based on provided description.",
@@ -12,15 +11,14 @@ const SYSTEM = [
   UPDATE_FILE_INST,
 ].join("\n");
 
-async function scaffold(_rootPath: string, _dirName: string) {
+async function scaffold(_rootPath: string) {
   // NOT IMPLEMENTED
 }
 
 const TASK_DEFS: Record<string, TaskDef> = {};
 
-function startApplication(rootPath: string, dirName: string, _port: number) {
-  const dir = path.join(rootPath, dirName);
-  return runBackground(dir, "bin/dev", []);
+function startApplication(rootPath: string, _port: number) {
+  return runBackground(rootPath, "bin/dev", []);
 }
 
 const t: Template = {

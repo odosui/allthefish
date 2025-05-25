@@ -5,7 +5,7 @@ import { WsInputMessage, WsOutputMessage } from "../../shared/types";
 import ConfigFile, { IConfigFile } from "./config_file";
 import { asString, log } from "./helpers";
 import { ProjectWorker, TemplateName, WorkerTask } from "./project_worker";
-import { addRestRoutes } from "./rest";
+import { addRestRoutes as registerRoutes } from "./rest";
 import {
   autoPilotOff,
   chatError,
@@ -58,7 +58,7 @@ async function main() {
   const config: IConfigFile | null = await ConfigFile.readConfig();
 
   const app = express();
-  addRestRoutes(app, config);
+  registerRoutes(app, config);
 
   const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
@@ -168,7 +168,7 @@ async function main() {
           config.projects_dir,
           project.dirname,
           project.port,
-          project.template
+          project.template,
         );
 
         const createRes = await worker.createProject();

@@ -14,6 +14,7 @@ export type Project = {
   id: string;
   name: string;
   full_path: string;
+  template: string;
 };
 
 function HomePage() {
@@ -46,14 +47,17 @@ function HomePage() {
 
   return (
     <main className="app no-chats">
-      {projects.map((p) => (
-        <div key={p.id}>
-          <h3>
-            <Link to={`/p/${p.id}`}>{p.name}</Link>
-          </h3>
-          <p>{p.full_path}</p>
-        </div>
-      ))}
+      <div className="project-list">
+        {projects.map((p) => (
+          <div key={p.id} className="item">
+            <h3>
+              <Link to={`/p/${p.id}`}>{p.name}</Link>
+            </h3>
+            <div className="template">{p.template}</div>
+            <p>{p.full_path}</p>
+          </div>
+        ))}
+      </div>
     </main>
   );
 }

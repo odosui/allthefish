@@ -389,3 +389,28 @@ li p {
 .chat-task {
   margin: var(--u1) var(--u2);
 }
+
+.project-list {
+  display: flex;
+  gap: var(--u2);
+
+  .item {
+    width: var(--u11);
+    background-color: white;
+    padding: var(--u2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--u1);
+
+    h3 {
+      font-size: 1.2em;
+      margin: 0 0 var(--u1) 0;
+    }
+
+    .template {
+      display: flex;
+      flex-direction: column;
+      gap: var(--u1);
+      color: var(--color-text-light);
+    }
+  }
+}

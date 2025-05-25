@@ -1,11 +1,13 @@
 import { ChildProcess } from "child_process";
-import fs from "fs/promises";
 import path from "path";
-import { log, runCmd } from "./helpers";
-import { TaskContext, TaskDef, UPDATE_FILE } from "./templates/common_tasks";
+import { log } from "./helpers";
+import { TaskContext, TaskDef } from "./tasks/common_tasks";
+import { UPDATE_FILE } from "./tasks/update_file";
 import rails from "./templates/rails";
 import { Template } from "./templates/template";
 import viteReactTs from "./templates/vite_react_ts";
+import { isDirExists } from "./utils/files";
+import { initGit } from "./utils/git";
 
 export type TemplateName = "vite:react-ts" | "rails";
 
@@ -37,7 +39,7 @@ export class ProjectWorker {
     rootPath: string,
     dirName: string,
     port: number,
-    template: TemplateName
+    template: TemplateName,
   ) {
     log(ACTOR, "Creating project worker", {
       rootPath,
@@ -71,7 +73,7 @@ export class ProjectWorker {
     this.serverProcess = TEMPLATES[this.template].startApplication(
       this.rootPath,
       this.dirName,
-      this.port
+      this.port,
     );
   }
 
@@ -134,23 +136,4 @@ export class ProjectWorker {
     }
     return def.title(task);
   }
-}
-
-async function initGit(dir: string) {
-  await runCmd(dir, "git", [
-    "config",
-    "--global",
-    "init.defaultBranch",
-    "main",
-  ]);
-  await runCmd(dir, "git", ["init", dir]);
-  await runCmd(dir, "git", ["add", "."]);
-  await runCmd(dir, "git", ["commit", "-m", "Initial commit"]);
-}
-
-async function isDirExists(dir: string) {
-  return await fs
-    .access(dir)
-    .then(() => true)
-    .catch(() => false);
 }

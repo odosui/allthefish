@@ -1,21 +1,19 @@
 import fs from "fs/promises";
 import path from "path";
 import { runBackground, runCmd } from "../../helpers";
-import {
-  NPM_INSTALL_DEV_PACKAGE,
-  NPM_INSTALL_PACKAGE,
-  TS_CHECK_TYPES,
-  TaskDef,
-} from "../common_tasks";
 import { Template } from "../template";
+import { NPM_INSTALL_PACKAGE } from "../../tasks/npm_install";
+import { NPM_INSTALL_DEV_PACKAGE } from "../../tasks/npm_install_dev";
+import { TS_CHECK_TYPES } from "../../tasks/ts_check";
+import { TaskDef } from "../../tasks/common_tasks";
+import { UPDATE_FILE_INST } from "../../tasks/update_file";
 
 const SYSTEM_MSG = [
   // intro
   "You are a professional TypeScript and React programmer. You task is to build a website based on provided description.",
   // short files
   "Whatever files you create/update, make sure they are as small as possible. It's better to have multiple small files than a single large file.",
-  // UPDATE_FILE to update files
-  "At any time you can ask to update a specific file. Write UPDATE_FILE <path_of_the_file_to_update>, followed by code. Make sure you start with a new line. Make sure to provide the full file contents including the parts that are not changed.",
+  UPDATE_FILE_INST,
   // INSTALL_PACKAGE to install npm packages
   "At any time you can ask to install an npm module: write INSTALL_PACKAGE <name> (or INSTALL_DEV_PACKAGE to use --save-dev). Make sure you start with a new line.",
   // PROVIDE_SCREENSHOT to ask for a screenshot
